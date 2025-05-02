@@ -1,0 +1,7 @@
+{
+    "name": "Tankille",
+    "render_readme": true,
+    "domain": "tankille",
+    "documentation": "https://github.com/yourusername/tankille-homeassistant",
+    "issue_tracker": "https://github.com/yourusername/tankille-homeassistant/issues"
+  }

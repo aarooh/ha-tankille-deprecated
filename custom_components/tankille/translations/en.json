@@ -1,0 +1,46 @@
+{
+    "config": {
+      "step": {
+        "user": {
+          "title": "Connect to Tankille",
+          "description": "Set up Tankille integration to track fuel prices in Finland",
+          "data": {
+            "email": "Email",
+            "password": "Password",
+            "scan_interval": "Update interval (seconds)"
+          }
+        }
+      },
+      "error": {
+        "cannot_connect": "Failed to connect, please try again",
+        "invalid_auth": "Invalid authentication",
+        "unknown": "Unexpected error"
+      },
+      "abort": {
+        "already_configured": "Account is already configured"
+      }
+    },
+    "entity": {
+      "sensor": {
+        "fuel_price": {
+          "name": "{station_name} {fuel_type}",
+          "state_attributes": {
+            "station_name": "Station Name",
+            "brand": "Brand",
+            "chain": "Chain",
+            "address": "Address",
+            "city": "City",
+            "street": "Street",
+            "zipcode": "Zipcode",
+            "updated": "Last Updated",
+            "latitude": "Latitude",
+            "longitude": "Longitude",
+            "price_updated": "Price Updated",
+            "price_reporter": "Price Reporter",
+            "price_delta": "Price Change",
+            "available_fuels": "Available Fuels"
+          }
+        }
+      }
+    }
+  }
