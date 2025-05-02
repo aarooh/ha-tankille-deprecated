@@ -3,6 +3,7 @@ Tankille integration for Home Assistant.
 
 This integration allows you to track fuel prices from stations in Finland.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -62,7 +63,9 @@ CONFIG_SCHEMA = vol.Schema(
             {
                 vol.Required(CONF_EMAIL): cv.string,
                 vol.Required(CONF_PASSWORD): cv.string,
-                vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(minutes=30)): cv.time_period,
+                vol.Optional(
+                    CONF_SCAN_INTERVAL, default=timedelta(minutes=30)
+                ): cv.time_period,
                 vol.Optional(CONF_LOCATION): vol.Schema(
                     {
                         vol.Required(CONF_LATITUDE): cv.latitude,
@@ -80,6 +83,7 @@ CONFIG_SCHEMA = vol.Schema(
 # List of platforms to set up
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tankille from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -90,7 +94,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
     client = TankilleClient()
-    
+
     try:
         await client.login(email, password)
     except AuthenticationError as err:
@@ -122,6 +126,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setup(entry, "sensor")
     return True
 
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
@@ -129,6 +134,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
+
 
 class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Tankille data."""
@@ -157,7 +163,7 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
         # Reset retry count if this is a scheduled update
         if self.retry_count >= self.max_retries:
             self.retry_count = 0
-        
+
         try:
             # First check if we need to refresh authentication
             if not self.client.token:
@@ -168,7 +174,7 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                 except (AuthenticationError, ApiError) as err:
                     _LOGGER.error("Failed to refresh authentication: %s", err)
                     raise UpdateFailed(f"Authentication error: {err}")
-            
+
             # Get all stations
             try:
                 stations = await self.client.get_stations_async()
@@ -176,38 +182,39 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                 self.retry_count += 1
                 _LOGGER.warning(
                     "Timeout while fetching stations (attempt %s of %s)",
-                    self.retry_count, self.max_retries
+                    self.retry_count,
+                    self.max_retries,
                 )
                 if self.retry_count < self.max_retries:
                     # Wait before retry (exponential backoff)
-                    await asyncio.sleep(2 ** self.retry_count)
+                    await asyncio.sleep(2**self.retry_count)
                     return await self._async_update_data()
                 raise UpdateFailed("Repeated timeouts while fetching station data")
-            
+
             # Process stations
             if not stations:
                 _LOGGER.warning("No stations returned from API")
                 return self.stations  # Return existing data
-                
+
             result = {}
             for station in stations:
                 if "_id" not in station:
                     _LOGGER.warning("Station missing ID: %s", station)
                     continue  # Skip stations without ID
-                    
+
                 result[station["_id"]] = station
-            
+
             # Log some statistics about the data
             _LOGGER.debug(
                 "Successfully fetched %s stations with %s total fuel prices",
                 len(result),
-                sum(len(station.get("price", [])) for station in result.values())
+                sum(len(station.get("price", [])) for station in result.values()),
             )
-                
+
             self.stations = result
             self.retry_count = 0  # Reset retry count on success
             return result
-            
+
         except AuthenticationError as err:
             _LOGGER.error("Authentication error during data update: %s", err)
             # Try to re-authenticate once
@@ -219,21 +226,23 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
             except Exception as auth_err:
                 _LOGGER.error("Failed to re-authenticate: %s", auth_err)
                 raise UpdateFailed(f"Authentication failed: {err}")
-                
+
         except ApiError as err:
             self.retry_count += 1
             _LOGGER.error(
                 "API error during data update (attempt %s of %s): %s",
-                self.retry_count, self.max_retries, err
+                self.retry_count,
+                self.max_retries,
+                err,
             )
-            
+
             if self.retry_count < self.max_retries:
                 # Wait before retry (exponential backoff)
-                await asyncio.sleep(2 ** self.retry_count)
+                await asyncio.sleep(2**self.retry_count)
                 return await self._async_update_data()
-                
+
             raise UpdateFailed(f"Repeated API errors: {err}")
-            
+
         except Exception as err:
             _LOGGER.exception("Unexpected error during data update: %s", err)
             raise UpdateFailed(f"Unexpected error: {err}")
