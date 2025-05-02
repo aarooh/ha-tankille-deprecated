@@ -1,12 +1,10 @@
 # Tankille for Home Assistant
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
-[![GitHub Release](https://img.shields.io/github/release/yourusername/tankille-homeassistant.svg)](https://github.com/yourusername/tankille-homeassistant/releases)
-[![GitHub License](https://img.shields.io/github/license/yourusername/tankille-homeassistant.svg)](https://github.com/yourusername/tankille-homeassistant/blob/main/LICENSE)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![GitHub Release](https://img.shields.io/github/release/aarooh/hacs-tankille.svg)](https://github.com/aarooh/hacs-tankille/releases)
+[![GitHub License](https://img.shields.io/github/license/aarooh/hacs-tankille.svg)](https://github.com/aarooh/hacs-tankille/blob/main/LICENSE)
 
 A Home Assistant integration that provides fuel price data from Tankille API for gas stations in Finland.
-
-![Tankille Example Dashboard](https://raw.githubusercontent.com/yourusername/tankille-homeassistant/main/images/dashboard_example.png)
 
 ## Features
 
@@ -36,7 +34,7 @@ A Home Assistant integration that provides fuel price data from Tankille API for
 1. Make sure [HACS](https://hacs.xyz/) is installed in your Home Assistant instance
 2. Add this repository as a custom repository in HACS:
    - Go to HACS → Integrations → ⋮ (top right) → Custom repositories
-   - Add the URL `https://github.com/yourusername/tankille-homeassistant` with category "Integration"
+   - Add the URL `https://github.com/aarooh/hacs-tankille` with category "Integration"
 3. Click "Tankille" in the list of integrations
 4. Click "Download"
 5. Restart Home Assistant
@@ -44,7 +42,7 @@ A Home Assistant integration that provides fuel price data from Tankille API for
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/yourusername/tankille-homeassistant/releases)
+1. Download the latest release from the [releases page](https://github.com/aarooh/hacs-tankille/releases)
 2. Unzip the release and copy the `custom_components/tankille` directory to your Home Assistant installation's `custom_components` directory
 3. Restart Home Assistant
 4. Go to "Configuration" → "Devices & Services" → "Add Integration" and search for "Tankille"

@@ -1,6 +1,5 @@
 # Tankille
 
-![Tankille Logo](https://raw.githubusercontent.com/yourusername/tankille-homeassistant/main/images/tankille_logo.png)
 
 ## What is Tankille?
 
@@ -17,7 +16,6 @@ Tankille is a Home Assistant integration that provides fuel price data for gas s
 
 ## Screenshot
 
-![Dashboard Example](https://raw.githubusercontent.com/yourusername/tankille-homeassistant/main/images/dashboard_example.png)
 
 ## Quick Setup
 
@@ -68,6 +66,6 @@ This integration requires a valid Tankille account:
 ### Need More Help?
 
 If you have any questions or need assistance, please:
-- Check the full [documentation](https://github.com/yourusername/tankille-homeassistant) for detailed troubleshooting
+- Check the full [documentation](https://github.com/aarooh/hacs-tankille) for detailed troubleshooting
 - Enable debug logging: Add `custom_components.tankille: debug` to your logger configuration
-- Open an [issue](https://github.com/yourusername/tankille-homeassistant/issues) on GitHub
+- Open an [issue](https://github.com/aarooh/hacs-tankille/issues) on GitHub

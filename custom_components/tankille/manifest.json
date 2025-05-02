@@ -1,9 +1,9 @@
 {
     "domain": "tankille",
     "name": "Tankille",
-    "documentation": "https://github.com/yourusername/tankille",
+    "documentation": "https://github.com/aarooh/hacs-tankille",
     "dependencies": [],
-    "codeowners": ["@yourusername"],
+    "codeowners": ["@aarooh"],
     "requirements": ["requests>=2.25.0", "aiohttp>=3.7.4"],
     "config_flow": true,
     "iot_class": "cloud_polling",
