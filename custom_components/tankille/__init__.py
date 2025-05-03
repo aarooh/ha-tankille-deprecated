@@ -94,35 +94,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = TankilleClient()
 
     try:
-        await client.login(email, password)
+        # Force login to ensure fresh tokens
+        await client.login(email, password, force=True)
+        _LOGGER.info("Successfully authenticated with Tankille API")
     except AuthenticationError as err:
         _LOGGER.error("Failed to authenticate with Tankille API: %s", err)
-        return False
+        if "Already logged in" in str(err):
+            # This is not really an error, just try to proceed
+            _LOGGER.info("Using existing authentication token")
+        else:
+            return False
     except ApiError as err:
         _LOGGER.error("API error during authentication: %s", err)
         return False
     except Exception as err:
         _LOGGER.exception("Unexpected error during authentication: %s", err)
         return False
-
-    coordinator = TankilleDataUpdateCoordinator(
-        hass, client=client, scan_interval=timedelta(seconds=scan_interval)
-    )
-
-    # Fetch initial data
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except Exception as err:
-        _LOGGER.exception("Error during initial data refresh: %s", err)
-        return False
-
-    hass.data[DOMAIN][entry.entry_id] = {
-        "coordinator": coordinator,
-        "client": client,
-    }
-
-    await hass.config_entries.async_forward_entry_setup(entry, "sensor")
-    return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

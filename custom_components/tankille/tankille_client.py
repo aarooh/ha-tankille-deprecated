@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 import async_timeout
+import aiofiles
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,32 +58,39 @@ class TankilleClient:
 
         self.session = session
         self._token_file = ".tankille_tokens.json"
-        self._load_tokens_from_file()
+        # Don't load tokens in __init__ since it's synchronous
+        # We'll load them when needed in async methods
+        self._tokens_loaded = False
 
-    def _load_tokens_from_file(self):
+    async def _load_tokens_from_file(self):
         """Load tokens from local file if available."""
+        if self._tokens_loaded:
+            return
+            
         if os.path.exists(self._token_file):
             try:
-                with open(self._token_file, "r") as f:
-                    data = json.load(f)
+                async with aiofiles.open(self._token_file, "r") as f:
+                    content = await f.read()
+                    data = json.loads(content)
                     self.token = data.get("access_token", "")
                     self.refresh_token = data.get("refresh_token", "")
                     self.token_cache = data.get("token_cache", self.token_cache)
             except Exception as e:
                 _LOGGER.error("Error loading tokens from file: %s", e)
+        
+        self._tokens_loaded = True
 
-    def _save_tokens_to_file(self):
+    async def _save_tokens_to_file(self):
         """Save tokens to local file."""
         try:
-            with open(self._token_file, "w") as f:
-                json.dump(
-                    {
-                        "access_token": self.token,
-                        "refresh_token": self.refresh_token,
-                        "token_cache": self.token_cache,
-                    },
-                    f,
-                )
+            data = {
+                "access_token": self.token,
+                "refresh_token": self.refresh_token,
+                "token_cache": self.token_cache,
+            }
+            
+            async with aiofiles.open(self._token_file, "w") as f:
+                await f.write(json.dumps(data))
         except Exception as e:
             _LOGGER.error("Error saving tokens to file: %s", e)
 
@@ -94,6 +102,8 @@ class TankilleClient:
 
     async def _auth_async(self):
         """Authenticate user if refresh token exists."""
+        await self._load_tokens_from_file()
+        
         if not self.refresh_token:
             raise AuthenticationError("No refresh token available. Please login first.")
 
@@ -179,7 +189,7 @@ class TankilleClient:
 
         Args:
             email: User email
-            password: User password
+            password: User password  
             force: Force login even if already logged in
 
         Returns:
@@ -188,22 +198,30 @@ class TankilleClient:
         Raises:
             AuthenticationError: If login fails
         """
+        # Load tokens before checking if logged in
+        await self._load_tokens_from_file()
+        
         login_options = {"email": email, "password": password, "force": force}
 
         if not email or not password:
             raise AuthenticationError("Email or password missing")
 
+        # Check if already logged in
         if not force and self.token:
-            raise AuthenticationError(
-                "Already logged in. Use force=True to login again."
-            )
+            # Try to use the existing token
+            try:
+                await self._auth_async()
+                return self.token
+            except AuthenticationError:
+                # If token is invalid, proceed with login
+                pass
 
         token_data = await self._get_refresh_token_async(login_options)
         access_token = await self._get_session_token_async(token_data)
 
         self.token = access_token
         self.refresh_token = token_data["refreshToken"]
-        self._save_tokens_to_file()
+        await self._save_tokens_to_file()
 
         return access_token
 
