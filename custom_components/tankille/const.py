@@ -9,10 +9,11 @@ CONF_LOCATION_LON = "lon"
 CONF_DISTANCE = "distance"
 CONF_STATION_ID = "station_id"
 CONF_STATION_IDS = "station_ids"
+CONF_USE_LOCATION_FILTER = "use_location_filter"
 
 # Defaults
 DEFAULT_SCAN_INTERVAL = 1800  # 30 minutes
-DEFAULT_DISTANCE = 15000  # 15 km
+DEFAULT_DISTANCE = 10000  # 10 km
 
 # Station attributes
 ATTR_STATION_NAME = "station_name"

@@ -1,23 +1,57 @@
 {
-    "config": {
-      "step": {
-        "user": {
-          "title": "Connect to Tankille",
-          "description": "Set up Tankille integration to track fuel prices in Finland",
-          "data": {
-            "email": "Email",
-            "password": "Password",
-            "scan_interval": "Update interval (seconds)"
-          }
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Tankille",
+        "description": "Set up Tankille integration to track fuel prices in Finland",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "scan_interval": "Update interval (seconds)"
         }
       },
-      "error": {
-        "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-        "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-        "unknown": "[%key:common::config_flow::error::unknown%]"
+      "location": {
+        "title": "Location Filtering",
+        "description": "{info}",
+        "data": {
+          "use_location_filter": "Filter stations by location"
+        }
       },
-      "abort": {
-        "already_configured": "[%key:common::config_flow::abort::already_configured_account%]"
+      "location_params": {
+        "title": "Location Parameters",
+        "description": "{info}",
+        "data": {
+          "lat": "Latitude",
+          "lon": "Longitude",
+          "distance": "Search radius (meters)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "invalid_latitude": "Invalid latitude. Must be between -90 and 90",
+      "invalid_longitude": "Invalid longitude. Must be between -180 and 180",
+      "invalid_distance": "Invalid distance. Must be between 1000 and 50000 meters",
+      "invalid_input": "Invalid input format"
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_account%]"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Tankille Options",
+        "description": "Configure options for Tankille integration",
+        "data": {
+          "scan_interval": "Update interval (seconds)",
+          "lat": "Latitude",
+          "lon": "Longitude",
+          "distance": "Search radius (meters)"
+        }
       }
     }
   }
+}

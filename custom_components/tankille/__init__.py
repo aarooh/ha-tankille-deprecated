@@ -44,6 +44,7 @@ from .const import (
     CONF_LOCATION_LON,
     CONF_STATION_ID,
     CONF_STATION_IDS,
+    CONF_USE_LOCATION_FILTER,
     DEFAULT_DISTANCE,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -112,7 +113,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     coordinator = TankilleDataUpdateCoordinator(
-        hass, client=client, scan_interval=timedelta(seconds=scan_interval)
+        hass, 
+        client=client, 
+        scan_interval=timedelta(seconds=scan_interval),
+        config_entry=entry
     )
 
     # Fetch initial data
@@ -157,11 +161,19 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
         hass: HomeAssistant,
         client: TankilleClient,
         scan_interval: timedelta,
+        config_entry: ConfigEntry,
     ) -> None:
         """Initialize global Tankille data updater."""
         self.client = client
+        self.config_entry = config_entry
         self.retry_count = 0
         self.max_retries = 3
+
+        # Extract location filtering config
+        self.use_location_filter = config_entry.data.get(CONF_USE_LOCATION_FILTER, False)
+        self.lat = config_entry.data.get(CONF_LOCATION_LAT)
+        self.lon = config_entry.data.get(CONF_LOCATION_LON)
+        self.distance = config_entry.data.get(CONF_DISTANCE, DEFAULT_DISTANCE)
 
         super().__init__(
             hass,
@@ -187,9 +199,23 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                     _LOGGER.error("Failed to refresh authentication: %s", err)
                     raise UpdateFailed(f"Authentication error: {err}")
 
-            # Get all stations
+            # Get stations based on configuration
             try:
-                stations = await self.client.get_stations()
+                if self.use_location_filter and self.lat and self.lon:
+                    _LOGGER.info(
+                        "Fetching stations within %s meters of %.6f, %.6f",
+                        self.distance,
+                        self.lat,
+                        self.lon
+                    )
+                    stations = await self.client.get_stations_by_location(
+                        float(self.lat),
+                        float(self.lon),
+                        int(self.distance)
+                    )
+                else:
+                    _LOGGER.info("Fetching all stations")
+                    stations = await self.client.get_stations()
             except asyncio.TimeoutError:
                 self.retry_count += 1
                 _LOGGER.warning(
@@ -217,7 +243,7 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                 result[station["_id"]] = station
 
             # Log some statistics about the data
-            _LOGGER.debug(
+            _LOGGER.info(
                 "Successfully fetched %s stations with %s total fuel prices",
                 len(result),
                 sum(len(station.get("price", [])) for station in result.values()),
