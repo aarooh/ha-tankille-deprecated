@@ -53,9 +53,6 @@ from .tankille_client import TankilleClient, ApiError, AuthenticationError
 
 _LOGGER = logging.getLogger(__name__)
 
-# Define the domain for the integration
-DOMAIN = "tankille"
-
 # Define the configuration schema for YAML setup
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -68,8 +65,8 @@ CONFIG_SCHEMA = vol.Schema(
                 ): cv.time_period,
                 vol.Optional(CONF_LOCATION): vol.Schema(
                     {
-                        vol.Required(CONF_LATITUDE): cv.latitude,
-                        vol.Required(CONF_LONGITUDE): cv.longitude,
+                        vol.Required('lat'): cv.latitude,
+                        vol.Required('lon'): cv.longitude,
                         vol.Optional(CONF_DISTANCE, default=15000): cv.positive_int,
                     }
                 ),
@@ -80,9 +77,10 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-# List of platforms to set up
-PLATFORMS: list[Platform] = [Platform.SENSOR]
-
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the Tankille component."""
+    hass.data.setdefault(DOMAIN, {})
+    return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tankille from a config entry."""
@@ -177,7 +175,7 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
 
             # Get all stations
             try:
-                stations = await self.client.get_stations_async()
+                stations = await self.client.get_stations()
             except asyncio.TimeoutError:
                 self.retry_count += 1
                 _LOGGER.warning(

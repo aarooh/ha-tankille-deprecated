@@ -1,7 +1,5 @@
 """Config flow for Tankille integration."""
-
 from __future__ import annotations
-
 import logging
 from typing import Any
 
@@ -26,32 +24,30 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
-
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
     client = TankilleClient()
-
     try:
         await client.login(data[CONF_EMAIL], data[CONF_PASSWORD])
     except AuthenticationError as err:
         raise InvalidAuth from err
     except ApiError as err:
         raise CannotConnect from err
-
+    
     # Return info that you want to store in the config entry.
     return {"title": f"Tankille ({data[CONF_EMAIL]})"}
 
-
-class TankilleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Tankille."""
-
+    
     VERSION = 1
-
+    
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the initial step."""
         errors: dict[str, str] = {}
+        
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
@@ -63,16 +59,18 @@ class TankilleConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
+                # Check if we already have an entry for this email
+                await self.async_set_unique_id(user_input[CONF_EMAIL])
+                self._abort_if_unique_id_configured()
+                
                 return self.async_create_entry(title=info["title"], data=user_input)
-
+        
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
         )
 
-
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
-
 
 class InvalidAuth(HomeAssistantError):
     """Error to indicate there is invalid auth."""

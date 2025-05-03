@@ -21,95 +21,33 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from . import TankilleDataUpdateCoordinator  # Import from __init__.py
 from .const import (
     DOMAIN,
     CONF_STATION_IDS,
     CONF_LOCATION,
     CONF_DISTANCE,
-    CONF_LATITUDE,
-    CONF_LONGITUDE,
+    CONF_LOCATION_LAT,  # Use these instead
+    CONF_LOCATION_LON,  # Use these instead
+    ATTR_STATION_NAME,
+    ATTR_STATION_BRAND,
+    ATTR_STATION_CHAIN,
+    ATTR_STATION_ADDRESS,
+    ATTR_STATION_CITY,
+    ATTR_STATION_STREET,
+    ATTR_STATION_ZIPCODE,
+    ATTR_STATION_UPDATED,
+    ATTR_STATION_LATITUDE,
+    ATTR_STATION_LONGITUDE,
+    ATTR_STATION_PRICE_UPDATED,
+    ATTR_STATION_PRICE_REPORTER,
+    ATTR_STATION_PRICE_DELTA,
+    ATTR_AVAILABLE_FUELS,
+    FUEL_TYPES,
+    FUEL_TYPE_NAMES,
 )
-from .coordinator import TankilleDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-
-# Define sensor types
-SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
-    SensorEntityDescription(
-        key="95 E10",
-        name="95 E10 Price",
-        icon="mdi:gas-station",
-        native_unit_of_measurement=CURRENCY_EURO,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="98 E5",
-        name="98 E5 Price",
-        icon="mdi:gas-station",
-        native_unit_of_measurement=CURRENCY_EURO,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="Diesel",
-        name="Diesel Price",
-        icon="mdi:gas-station",
-        native_unit_of_measurement=CURRENCY_EURO,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    # Add other fuel types if needed
-)
-
-
-async def async_setup_platform(
-    hass: HomeAssistant,
-    config: ConfigType,
-    async_add_entities: AddEntitiesCallback,
-    discovery_info: Optional[DiscoveryInfoType] = None,
-) -> None:
-    """Set up the Tankille sensor platform."""
-    if discovery_info is None:
-        return
-
-    coordinator = hass.data[DOMAIN]["coordinator"]
-    client = hass.data[DOMAIN]["client"]
-    config = discovery_info["config"]
-
-    entities = []
-
-    # If location is provided, get stations by location
-    if CONF_LOCATION in config:
-        location_config = config[CONF_LOCATION]
-        lat = location_config[CONF_LOCATION_LAT]
-        lon = location_config[CONF_LOCATION_LON]
-        distance = location_config.get(CONF_DISTANCE)
-
-        try:
-            stations = await client.get_stations_by_location_async(lat, lon, distance)
-            for station in stations:
-                for fuel_type in station["fuels"]:
-                    if fuel_type in FUEL_TYPES:
-                        entities.append(
-                            TankilleFuelPriceSensor(
-                                coordinator, station["_id"], fuel_type
-                            )
-                        )
-        except Exception as err:
-            _LOGGER.error("Error fetching stations by location: %s", err)
-
-    # Add specific station IDs if provided
-    for station_id in config.get(CONF_STATION_IDS, []):
-        try:
-            station = await client.get_station_async(station_id)
-            for fuel_type in station["fuels"]:
-                if fuel_type in FUEL_TYPES:
-                    entities.append(
-                        TankilleFuelPriceSensor(coordinator, station_id, fuel_type)
-                    )
-        except Exception as err:
-            _LOGGER.error("Error fetching station %s: %s", station_id, err)
-
-    async_add_entities(entities, True)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -123,7 +61,7 @@ async def async_setup_entry(
 
     # Process all stations from the coordinator
     for station_id, station_data in coordinator.stations.items():
-        for fuel_type in station_data["fuels"]:
+        for fuel_type in station_data.get("fuels", []):
             if fuel_type in FUEL_TYPES:
                 entities.append(
                     TankilleFuelPriceSensor(coordinator, station_id, fuel_type)
@@ -150,7 +88,7 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
         # Initialize to get station data for the first time
-        self._station = self.coordinator.stations.get(station_id, {})
+        self._station = self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
 
         # Set entity ID and unique ID
         self._attr_unique_id = f"{DOMAIN}_{station_id}_{fuel_type}"
@@ -182,7 +120,7 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
             return False
 
         # Make sure the station exists in the coordinator data
-        if self.station_id not in self.coordinator.stations:
+        if self.station_id not in self.coordinator.data:
             return False
 
         return True
@@ -193,7 +131,7 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         if not self.available:
             return None
 
-        station = self.coordinator.stations[self.station_id]
+        station = self.coordinator.data[self.station_id]
 
         # Find the latest price for this fuel type
         for price in station.get("price", []):
@@ -210,7 +148,7 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         if not self.available:
             return attrs
 
-        station = self.coordinator.stations[self.station_id]
+        station = self.coordinator.data[self.station_id]
 
         # Basic station info
         attrs[ATTR_STATION_NAME] = station.get("name")
