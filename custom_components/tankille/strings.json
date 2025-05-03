@@ -3,27 +3,15 @@
     "step": {
       "user": {
         "title": "Connect to Tankille",
-        "description": "Set up Tankille integration to track fuel prices in Finland",
+        "description": "{info}",
         "data": {
           "email": "Email",
           "password": "Password",
-          "scan_interval": "Update interval (seconds)"
-        }
-      },
-      "location": {
-        "title": "Location Filtering",
-        "description": "{info}",
-        "data": {
-          "use_location_filter": "Filter stations by location"
-        }
-      },
-      "location_params": {
-        "title": "Location Parameters",
-        "description": "{info}",
-        "data": {
+          "scan_interval": "Update interval (seconds)",
+          "use_location_filter": "Filter stations by location",
           "lat": "Latitude",
           "lon": "Longitude",
-          "distance": "Search radius (meters)"
+          "distance": "Search radius (meters, recommended 2000-15000)"
         }
       }
     },
@@ -38,20 +26,6 @@
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_account%]"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Tankille Options",
-        "description": "Configure options for Tankille integration",
-        "data": {
-          "scan_interval": "Update interval (seconds)",
-          "lat": "Latitude",
-          "lon": "Longitude",
-          "distance": "Search radius (meters)"
-        }
-      }
     }
   }
 }
