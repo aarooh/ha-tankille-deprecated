@@ -99,6 +99,12 @@ class TankilleClient:
         if self.session is None:
             self.session = aiohttp.ClientSession()
         return self.session
+    
+    async def close(self):
+        """Close the client session."""
+        if self.session and not self.session.closed:
+            await self.session.close()
+            self.session = None
 
     async def _auth_async(self):
         """Authenticate user if refresh token exists."""

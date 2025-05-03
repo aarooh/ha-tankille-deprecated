@@ -57,15 +57,20 @@ async def async_setup_entry(
     """Set up Tankille sensor based on a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
+    # Wait for the coordinator to have data
+    if not coordinator.data:
+        await coordinator.async_request_refresh()
+
     entities = []
 
     # Process all stations from the coordinator
-    for station_id, station_data in coordinator.stations.items():
-        for fuel_type in station_data.get("fuels", []):
-            if fuel_type in FUEL_TYPES:
-                entities.append(
-                    TankilleFuelPriceSensor(coordinator, station_id, fuel_type)
-                )
+    if coordinator.data:
+        for station_id, station_data in coordinator.data.items():
+            for fuel_type in station_data.get("fuels", []):
+                if fuel_type in FUEL_TYPES:
+                    entities.append(
+                        TankilleFuelPriceSensor(coordinator, station_id, fuel_type)
+                    )
 
     async_add_entities(entities, True)
 
@@ -87,14 +92,18 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         self._attr_device_class = SensorDeviceClass.MONETARY
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
-        # Initialize to get station data for the first time
-        self._station = self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
+        # Initialize station data
+        self._station = None
+        if self.coordinator.data:
+            self._station = self.coordinator.data.get(station_id, {})
 
         # Set entity ID and unique ID
         self._attr_unique_id = f"{DOMAIN}_{station_id}_{fuel_type}"
 
         # Set entity name based on station name and fuel type
-        station_name = self._station.get("name", "Unknown Station")
+        station_name = "Unknown Station"
+        if self._station:
+            station_name = self._station.get("name", "Unknown Station")
         fuel_name = FUEL_TYPE_NAMES.get(fuel_type, fuel_type)
         self._attr_name = f"{station_name} {fuel_name}"
 

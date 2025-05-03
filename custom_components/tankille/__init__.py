@@ -111,11 +111,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.exception("Unexpected error during authentication: %s", err)
         return False
 
+    coordinator = TankilleDataUpdateCoordinator(
+        hass, client=client, scan_interval=timedelta(seconds=scan_interval)
+    )
+
+    # Fetch initial data
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception as err:
+        _LOGGER.exception("Error during initial data refresh: %s", err)
+        # Clean up the client session before returning
+        if client.session and not client.session.closed:
+            await client.session.close()
+        return False
+
+    hass.data[DOMAIN][entry.entry_id] = {
+        "coordinator": coordinator,
+        "client": client,
+    }
+
+    await hass.config_entries.async_forward_entry_setup(entry, "sensor")
+    return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
+    
     if unload_ok:
+        # Get the client and close its session
+        client = hass.data[DOMAIN][entry.entry_id]["client"]
+        if client.session and not client.session.closed:
+            await client.session.close()
+        
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
@@ -132,7 +160,6 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
     ) -> None:
         """Initialize global Tankille data updater."""
         self.client = client
-        self.stations: Dict[str, Any] = {}
         self.retry_count = 0
         self.max_retries = 3
 
@@ -179,7 +206,7 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
             # Process stations
             if not stations:
                 _LOGGER.warning("No stations returned from API")
-                return self.stations  # Return existing data
+                return {}  # Return empty dict instead of None
 
             result = {}
             for station in stations:
@@ -196,7 +223,6 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                 sum(len(station.get("price", [])) for station in result.values()),
             )
 
-            self.stations = result
             self.retry_count = 0  # Reset retry count on success
             return result
 
