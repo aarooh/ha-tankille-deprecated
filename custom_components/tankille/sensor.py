@@ -185,6 +185,12 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         # Last update time
         if "updated" in station:
             attrs[ATTR_STATION_UPDATED] = station["updated"]
+            # Add human-readable format
+            try:
+                dt = datetime.fromisoformat(station["updated"].replace("Z", "+00:00"))
+                attrs["last_update_formatted"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+            except:
+                pass  # If parsing fails, just skip the formatted version
 
         # Price specific information
         for price in station.get("price", []):
@@ -192,6 +198,10 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
                 attrs[ATTR_STATION_PRICE_UPDATED] = price.get("updated")
                 attrs[ATTR_STATION_PRICE_REPORTER] = price.get("reporter")
                 attrs[ATTR_STATION_PRICE_DELTA] = price.get("delta")
+                # Add formatted timestamp for price
+                try:
+                    dt = datetime.fromisoformat(price["updated"].replace("Z", "+00:00"))
+                    attrs["price_update_formatted"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    pass
                 break
-
-        return attrs

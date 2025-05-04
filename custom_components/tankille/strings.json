@@ -3,14 +3,14 @@
     "step": {
       "user": {
         "title": "Connect to Tankille",
-        "description": "{info}",
+        "description": "{info}\n\nCurrent Home Assistant location: ({current_lat}, {current_lon})",
         "data": {
           "email": "Email",
           "password": "Password",
           "scan_interval": "Update interval (seconds)",
           "use_location_filter": "Filter stations by location",
-          "lat": "Latitude",
-          "lon": "Longitude",
+          "lat": "Latitude (currently: {current_lat})",
+          "lon": "Longitude (currently: {current_lon})",
           "distance": "Search radius (meters, recommended 2000-15000)"
         }
       }
