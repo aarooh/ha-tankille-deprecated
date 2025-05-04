@@ -185,3 +185,16 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - This integration uses the Tankille API which provides fuel price data for stations in Finland
 - Thanks to all contributors who have helped improve this integration
+
+## Future TODO
+
+Here are some potential ideas for future enhancements:
+
+- **Price Trend Analysis:** Add attributes or separate sensors showing price trends (e.g., 7-day change, lowest price in the last X days).
+- **Price Drop Notifications:** Allow users to configure notifications if a fuel price at a specific station drops below a certain threshold.
+- **Map Integration:** Explore displaying stations on a map card within Home Assistant.
+- **Fuel Type Filtering:** Allow users to select only the fuel types they are interested in during configuration to reduce the number of sensors created.
+- **Favorite Stations Comparison:** Add functionality to easily compare prices across a user-defined list of favorite stations.
+- **Historical Data:** Leverage the Home Assistant recorder component to store and potentially visualize historical price data (e.g., using ApexCharts card).
+- **Configurable Station Update Intervals:** Allow different update frequencies for specific high-interest stations versus general background updates.
+- **UI Configuration for Station Selection:** Instead of relying solely on location radius, allow users to pick specific stations from a list during setup or via options flow.

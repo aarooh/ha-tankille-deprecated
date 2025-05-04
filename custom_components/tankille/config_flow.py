@@ -108,10 +108,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=STEP_USER_DATA_SCHEMA, 
             errors=errors,
             description_placeholders={
-                "info": "Configure Tankille integration. Location filtering is recommended to avoid creating too many sensors (2-15 km range recommended).",
-                "current_lat": str(default_lat),
-                "current_lon": str(default_lon),
-                "location_info": f"Default location: {default_lat:.6f}, {default_lon:.6f}"
+                "info": "Configure Tankille integration. Location filtering is strongly recommended to avoid creating hundreds of sensors.\n\nTip: Use 2-5 km radius in cities, 10-15 km in rural areas."
             }
         )
 

@@ -4,31 +4,23 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
-    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CURRENCY_EURO
+from homeassistant.const import CURRENCY_EURO
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import dt as dt_util
 
-from . import TankilleDataUpdateCoordinator  # Import from __init__.py
+from . import TankilleDataUpdateCoordinator
 from .const import (
     DOMAIN,
-    CONF_STATION_IDS,
-    CONF_LOCATION,
-    CONF_DISTANCE,
-    CONF_LOCATION_LAT,  # Use these instead
-    CONF_LOCATION_LON,  # Use these instead
     ATTR_STATION_NAME,
     ATTR_STATION_BRAND,
     ATTR_STATION_CHAIN,
@@ -45,6 +37,11 @@ from .const import (
     ATTR_AVAILABLE_FUELS,
     FUEL_TYPES,
     FUEL_TYPE_NAMES,
+    FUEL_TYPE_NGAS,
+    FUEL_TYPE_BGAS,
+    FUEL_TYPE_98_PLUS,
+    FUEL_TYPE_DIESEL_PLUS,
+    FUEL_TYPE_HVO,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,6 +63,11 @@ async def async_setup_entry(
     # Process all stations from the coordinator
     if coordinator.data:
         for station_id, station_data in coordinator.data.items():
+            # Add station update sensor (disabled by default)
+            entities.append(
+                TankilleStationUpdateSensor(coordinator, station_id)
+            )
+            
             for fuel_type in station_data.get("fuels", []):
                 if fuel_type in FUEL_TYPES:
                     entities.append(
@@ -93,19 +95,26 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
         # Initialize station data
-        self._station = None
-        if self.coordinator.data:
-            self._station = self.coordinator.data.get(station_id, {})
+        self._station = self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
 
         # Set entity ID and unique ID
         self._attr_unique_id = f"{DOMAIN}_{station_id}_{fuel_type}"
 
         # Set entity name based on station name and fuel type
-        station_name = "Unknown Station"
-        if self._station:
-            station_name = self._station.get("name", "Unknown Station")
+        station_name = self._station.get("name", "Unknown Station")
         fuel_name = FUEL_TYPE_NAMES.get(fuel_type, fuel_type)
         self._attr_name = f"{station_name} {fuel_name}"
+
+        # Disable less common fuel types by default
+        disabled_by_default = [
+            FUEL_TYPE_NGAS,  # Natural Gas
+            FUEL_TYPE_BGAS,  # Biogas
+            FUEL_TYPE_98_PLUS,  # 98 Premium
+            FUEL_TYPE_DIESEL_PLUS,  # Diesel Premium
+            FUEL_TYPE_HVO,  # HVO Diesel
+        ]
+        
+        self._attr_entity_registry_enabled_default = fuel_type not in disabled_by_default
 
         # Initialize device info
         self._init_device_info()
@@ -115,24 +124,32 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         if not self._station:
             return
 
+        device_updated = self._format_timestamp(self._station.get("updated"))
+        
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.station_id)},
             name=self._station.get("name", "Unknown Station"),
             manufacturer=self._station.get("chain", "Unknown"),
             model=self._station.get("brand", "Unknown"),
+            sw_version=f"Updated: {device_updated}",
         )
+
+    def _format_timestamp(self, timestamp: Optional[str], format_str: str = "%Y-%m-%d %H:%M") -> str:
+        """Format ISO timestamp to human readable format."""
+        if not timestamp:
+            return "Unknown"
+        
+        try:
+            dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            return dt.strftime(format_str)
+        except (ValueError, AttributeError):
+            return timestamp
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-
-        # Make sure the station exists in the coordinator data
-        if self.station_id not in self.coordinator.data:
-            return False
-
-        return True
+        return (self.coordinator.last_update_success and 
+                self.station_id in self.coordinator.data)
 
     @property
     def native_value(self) -> Optional[float]:
@@ -152,56 +169,98 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return the state attributes."""
-        attrs = {}
-
         if not self.available:
-            return attrs
+            return {}
 
         station = self.coordinator.data[self.station_id]
-
-        # Basic station info
-        attrs[ATTR_STATION_NAME] = station.get("name")
-        attrs[ATTR_STATION_BRAND] = station.get("brand")
-        attrs[ATTR_STATION_CHAIN] = station.get("chain")
-        attrs[ATTR_AVAILABLE_FUELS] = ", ".join(station.get("fuels", []))
+        attrs = {
+            ATTR_STATION_NAME: station.get("name"),
+            ATTR_STATION_BRAND: station.get("brand"),
+            ATTR_STATION_CHAIN: station.get("chain"),
+            ATTR_AVAILABLE_FUELS: ", ".join(station.get("fuels", [])),
+        }
 
         # Location information
-        if "address" in station:
-            address = station["address"]
-            attrs[ATTR_STATION_STREET] = address.get("street")
-            attrs[ATTR_STATION_CITY] = address.get("city")
-            attrs[ATTR_STATION_ZIPCODE] = address.get("zipcode")
-            attrs[ATTR_STATION_ADDRESS] = (
-                f"{address.get('street')}, {address.get('city')} {address.get('zipcode')}"
-            )
+        if address := station.get("address"):
+            attrs.update({
+                ATTR_STATION_STREET: address.get("street"),
+                ATTR_STATION_CITY: address.get("city"),
+                ATTR_STATION_ZIPCODE: address.get("zipcode"),
+                ATTR_STATION_ADDRESS: f"{address.get('street')}, {address.get('city')} {address.get('zipcode')}",
+            })
 
         # Coordinates
-        if "location" in station and "coordinates" in station["location"]:
-            coords = station["location"]["coordinates"]
-            if len(coords) >= 2:
-                attrs[ATTR_STATION_LONGITUDE] = coords[0]
-                attrs[ATTR_STATION_LATITUDE] = coords[1]
+        if location := station.get("location"):
+            if coords := location.get("coordinates"):
+                if len(coords) >= 2:
+                    attrs[ATTR_STATION_LONGITUDE] = coords[0]
+                    attrs[ATTR_STATION_LATITUDE] = coords[1]
 
         # Last update time
-        if "updated" in station:
-            attrs[ATTR_STATION_UPDATED] = station["updated"]
-            # Add human-readable format
-            try:
-                dt = datetime.fromisoformat(station["updated"].replace("Z", "+00:00"))
-                attrs["last_update_formatted"] = dt.strftime("%Y-%m-%d %H:%M:%S")
-            except:
-                pass  # If parsing fails, just skip the formatted version
+        if updated := station.get("updated"):
+            attrs[ATTR_STATION_UPDATED] = updated
+            attrs["last_update_formatted"] = self._format_timestamp(updated, "%Y-%m-%d %H:%M:%S")
 
         # Price specific information
         for price in station.get("price", []):
             if price.get("tag") == self.fuel_type:
-                attrs[ATTR_STATION_PRICE_UPDATED] = price.get("updated")
-                attrs[ATTR_STATION_PRICE_REPORTER] = price.get("reporter")
-                attrs[ATTR_STATION_PRICE_DELTA] = price.get("delta")
-                # Add formatted timestamp for price
-                try:
-                    dt = datetime.fromisoformat(price["updated"].replace("Z", "+00:00"))
-                    attrs["price_update_formatted"] = dt.strftime("%Y-%m-%d %H:%M:%S")
-                except:
-                    pass
+                if price_updated := price.get("updated"):
+                    attrs[ATTR_STATION_PRICE_UPDATED] = price_updated
+                    attrs["price_update_formatted"] = self._format_timestamp(price_updated, "%Y-%m-%d %H:%M:%S")
+                
+                attrs.update({
+                    ATTR_STATION_PRICE_REPORTER: price.get("reporter"),
+                    ATTR_STATION_PRICE_DELTA: price.get("delta"),
+                })
                 break
+
+        return attrs
+
+
+class TankilleStationUpdateSensor(CoordinatorEntity, SensorEntity):
+    """Represents a station update timestamp sensor."""
+
+    def __init__(
+        self,
+        coordinator: TankilleDataUpdateCoordinator,
+        station_id: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self.station_id = station_id
+        
+        self._attr_unique_id = f"{DOMAIN}_{station_id}_updated"
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+        self._attr_entity_registry_enabled_default = False  # Disabled by default
+        
+        # Initialize station data
+        self._station = self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
+            
+        station_name = self._station.get("name", "Unknown Station")
+        self._attr_name = f"{station_name} Last Updated"
+        
+        # Set device info
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self.station_id)},
+            name=station_name,
+        )
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (self.coordinator.last_update_success and 
+                self.station_id in self.coordinator.data)
+
+    @property
+    def native_value(self) -> Optional[datetime]:
+        """Return the timestamp when the station was last updated."""
+        if not self.available:
+            return None
+            
+        station = self.coordinator.data[self.station_id]
+        if updated := station.get("updated"):
+            try:
+                return datetime.fromisoformat(updated.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                return None
+        return None

@@ -3,15 +3,15 @@
     "step": {
       "user": {
         "title": "Connect to Tankille",
-        "description": "{info}\n\nCurrent Home Assistant location: ({current_lat}, {current_lon})",
+        "description": "Configure Tankille integration. Location filtering is strongly recommended to avoid creating hundreds of sensors.\n\nTip: Use 2-5 km radius in cities, 10-15 km in rural areas.",
         "data": {
           "email": "Email",
           "password": "Password",
           "scan_interval": "Update interval (seconds)",
           "use_location_filter": "Filter stations by location",
-          "lat": "Latitude (currently: {current_lat})",
-          "lon": "Longitude (currently: {current_lon})",
-          "distance": "Search radius (meters, recommended 2000-15000)"
+          "lat": "Latitude",
+          "lon": "Longitude",
+          "distance": "Search radius (meters, 5000 = 5 km)"
         }
       }
     },
