@@ -231,7 +231,7 @@ class TankilleStationUpdateSensor(CoordinatorEntity, SensorEntity):
         
         self._attr_unique_id = f"{DOMAIN}_{station_id}_updated"
         self._attr_device_class = SensorDeviceClass.TIMESTAMP
-        self._attr_entity_registry_enabled_default = False  # Disabled by default
+        self._attr_entity_registry_enabled_default = True   #Enabled by default
         
         # Initialize station data
         self._station = self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
