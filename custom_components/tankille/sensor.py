@@ -46,6 +46,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -64,21 +65,24 @@ async def async_setup_entry(
     if coordinator.data:
         for station_id, station_data in coordinator.data.items():
             # Add station update sensor (automatically enabled)
-            _LOGGER.debug("Creating Last Updated sensor for station: %s", station_data.get("name", station_id))
-            entities.append(
-                TankilleStationUpdateSensor(coordinator, station_id)
+            _LOGGER.debug(
+                "Creating Last Updated sensor for station: %s",
+                station_data.get("name", station_id),
             )
-            
+            entities.append(TankilleStationUpdateSensor(coordinator, station_id))
+
             for fuel_type in station_data.get("fuels", []):
                 if fuel_type in FUEL_TYPES:
                     entities.append(
                         TankilleFuelPriceSensor(coordinator, station_id, fuel_type)
                     )
 
-    _LOGGER.info("Created %d entities (%d stations with Last Updated sensors)", 
-                 len(entities), 
-                 len([e for e in entities if isinstance(e, TankilleStationUpdateSensor)]))
-    
+    _LOGGER.info(
+        "Created %d entities (%d stations with Last Updated sensors)",
+        len(entities),
+        len([e for e in entities if isinstance(e, TankilleStationUpdateSensor)]),
+    )
+
     async_add_entities(entities, True)
 
 
@@ -100,7 +104,9 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
         # Initialize station data
-        self._station = self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
+        self._station = (
+            self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
+        )
 
         # Set entity ID and unique ID
         self._attr_unique_id = f"{DOMAIN}_{station_id}_{fuel_type}"
@@ -118,8 +124,10 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
             FUEL_TYPE_DIESEL_PLUS,  # Diesel Premium
             FUEL_TYPE_HVO,  # HVO Diesel
         ]
-        
-        self._attr_entity_registry_enabled_default = fuel_type not in disabled_by_default
+
+        self._attr_entity_registry_enabled_default = (
+            fuel_type not in disabled_by_default
+        )
 
         # Initialize device info
         self._init_device_info()
@@ -130,7 +138,7 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
             return
 
         device_updated = self._format_timestamp(self._station.get("updated"))
-        
+
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.station_id)},
             name=self._station.get("name", "Unknown Station"),
@@ -139,11 +147,13 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
             sw_version=f"Updated: {device_updated}",
         )
 
-    def _format_timestamp(self, timestamp: Optional[str], format_str: str = "%Y-%m-%d %H:%M") -> str:
+    def _format_timestamp(
+        self, timestamp: Optional[str], format_str: str = "%Y-%m-%d %H:%M"
+    ) -> str:
         """Format ISO timestamp to human readable format."""
         if not timestamp:
             return "Unknown"
-        
+
         try:
             dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
             return dt.strftime(format_str)
@@ -153,8 +163,10 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (self.coordinator.last_update_success and 
-                self.station_id in self.coordinator.data)
+        return (
+            self.coordinator.last_update_success
+            and self.station_id in self.coordinator.data
+        )
 
     @property
     def native_value(self) -> Optional[float]:
@@ -187,12 +199,14 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
 
         # Location information
         if address := station.get("address"):
-            attrs.update({
-                ATTR_STATION_STREET: address.get("street"),
-                ATTR_STATION_CITY: address.get("city"),
-                ATTR_STATION_ZIPCODE: address.get("zipcode"),
-                ATTR_STATION_ADDRESS: f"{address.get('street')}, {address.get('city')} {address.get('zipcode')}",
-            })
+            attrs.update(
+                {
+                    ATTR_STATION_STREET: address.get("street"),
+                    ATTR_STATION_CITY: address.get("city"),
+                    ATTR_STATION_ZIPCODE: address.get("zipcode"),
+                    ATTR_STATION_ADDRESS: f"{address.get('street')}, {address.get('city')} {address.get('zipcode')}",
+                }
+            )
 
         # Coordinates
         if location := station.get("location"):
@@ -204,19 +218,25 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         # Last update time
         if updated := station.get("updated"):
             attrs[ATTR_STATION_UPDATED] = updated
-            attrs["last_update_formatted"] = self._format_timestamp(updated, "%Y-%m-%d %H:%M:%S")
+            attrs["last_update_formatted"] = self._format_timestamp(
+                updated, "%Y-%m-%d %H:%M:%S"
+            )
 
         # Price specific information
         for price in station.get("price", []):
             if price.get("tag") == self.fuel_type:
                 if price_updated := price.get("updated"):
                     attrs[ATTR_STATION_PRICE_UPDATED] = price_updated
-                    attrs["price_update_formatted"] = self._format_timestamp(price_updated, "%Y-%m-%d %H:%M:%S")
-                
-                attrs.update({
-                    ATTR_STATION_PRICE_REPORTER: price.get("reporter"),
-                    ATTR_STATION_PRICE_DELTA: price.get("delta"),
-                })
+                    attrs["price_update_formatted"] = self._format_timestamp(
+                        price_updated, "%Y-%m-%d %H:%M:%S"
+                    )
+
+                attrs.update(
+                    {
+                        ATTR_STATION_PRICE_REPORTER: price.get("reporter"),
+                        ATTR_STATION_PRICE_DELTA: price.get("delta"),
+                    }
+                )
                 break
 
         return attrs
@@ -233,50 +253,61 @@ class TankilleStationUpdateSensor(CoordinatorEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.station_id = station_id
-        
+
         self._attr_unique_id = f"{DOMAIN}_{station_id}_last_updated"
         self._attr_device_class = SensorDeviceClass.TIMESTAMP
-        
+
         # ALWAYS enable the Last Updated sensor by default for all stations
         self._attr_entity_registry_enabled_default = True
-        
+
         # Initialize station data
-        self._station = self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
-            
+        self._station = (
+            self.coordinator.data.get(station_id, {}) if self.coordinator.data else {}
+        )
+
         station_name = self._station.get("name", "Unknown Station")
         self._attr_name = f"{station_name} Last Updated"
-        
+
         # Add helpful icon for the timestamp sensor
         self._attr_icon = "mdi:clock-outline"
-        
+
         # Set device info
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.station_id)},
             name=station_name,
         )
-        
-        _LOGGER.debug("Created Last Updated sensor for station '%s' (ID: %s) - Auto-enabled: %s", 
-                     station_name, station_id, self._attr_entity_registry_enabled_default)
+
+        _LOGGER.debug(
+            "Created Last Updated sensor for station '%s' (ID: %s) - Auto-enabled: %s",
+            station_name,
+            station_id,
+            self._attr_entity_registry_enabled_default,
+        )
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (self.coordinator.last_update_success and 
-                self.station_id in self.coordinator.data)
+        return (
+            self.coordinator.last_update_success
+            and self.station_id in self.coordinator.data
+        )
 
     @property
     def native_value(self) -> Optional[datetime]:
         """Return the timestamp when the station was last updated."""
         if not self.available:
             return None
-            
+
         station = self.coordinator.data[self.station_id]
         if updated := station.get("updated"):
             try:
                 return datetime.fromisoformat(updated.replace("Z", "+00:00"))
             except (ValueError, AttributeError):
-                _LOGGER.warning("Invalid timestamp format for station %s: %s", 
-                               self.station_id, updated)
+                _LOGGER.warning(
+                    "Invalid timestamp format for station %s: %s",
+                    self.station_id,
+                    updated,
+                )
                 return None
         return None
 
@@ -288,35 +319,39 @@ class TankilleStationUpdateSensor(CoordinatorEntity, SensorEntity):
 
         station = self.coordinator.data[self.station_id]
         attrs = {}
-        
+
         # Add formatted timestamp for easier reading
         if updated := station.get("updated"):
             try:
                 dt = datetime.fromisoformat(updated.replace("Z", "+00:00"))
-                attrs.update({
-                    "formatted_time": dt.strftime("%Y-%m-%d %H:%M:%S"),
-                    "time_ago": self._time_ago(dt),
-                    "raw_timestamp": updated,
-                })
+                attrs.update(
+                    {
+                        "formatted_time": dt.strftime("%Y-%m-%d %H:%M:%S"),
+                        "time_ago": self._time_ago(dt),
+                        "raw_timestamp": updated,
+                    }
+                )
             except (ValueError, AttributeError):
                 attrs["raw_timestamp"] = updated
-                
+
         # Add station info
-        attrs.update({
-            ATTR_STATION_NAME: station.get("name"),
-            ATTR_STATION_BRAND: station.get("brand"),
-            ATTR_STATION_CHAIN: station.get("chain"),
-            "total_fuel_types": len(station.get("fuels", [])),
-            "available_fuel_types": ", ".join(station.get("fuels", [])),
-        })
-        
+        attrs.update(
+            {
+                ATTR_STATION_NAME: station.get("name"),
+                ATTR_STATION_BRAND: station.get("brand"),
+                ATTR_STATION_CHAIN: station.get("chain"),
+                "total_fuel_types": len(station.get("fuels", [])),
+                "available_fuel_types": ", ".join(station.get("fuels", [])),
+            }
+        )
+
         return attrs
-    
+
     def _time_ago(self, dt: datetime) -> str:
         """Calculate human-readable time ago string."""
         now = datetime.now(dt.tzinfo)
         diff = now - dt
-        
+
         if diff.days > 0:
             return f"{diff.days} day{'s' if diff.days != 1 else ''} ago"
         elif diff.seconds > 3600:

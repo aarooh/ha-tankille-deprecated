@@ -66,8 +66,8 @@ CONFIG_SCHEMA = vol.Schema(
                 ): cv.time_period,
                 vol.Optional(CONF_LOCATION): vol.Schema(
                     {
-                        vol.Required('lat'): cv.latitude,
-                        vol.Required('lon'): cv.longitude,
+                        vol.Required("lat"): cv.latitude,
+                        vol.Required("lon"): cv.longitude,
                         vol.Optional(CONF_DISTANCE, default=15000): cv.positive_int,
                     }
                 ),
@@ -78,10 +78,12 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Tankille component."""
     hass.data.setdefault(DOMAIN, {})
     return True
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tankille from a config entry."""
@@ -113,10 +115,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     coordinator = TankilleDataUpdateCoordinator(
-        hass, 
-        client=client, 
+        hass,
+        client=client,
         scan_interval=timedelta(seconds=scan_interval),
-        config_entry=entry
+        config_entry=entry,
     )
 
     # Fetch initial data
@@ -141,13 +143,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
-    
+
     if unload_ok:
         # Get the client and close its session
         client = hass.data[DOMAIN][entry.entry_id]["client"]
         if client.session and not client.session.closed:
             await client.session.close()
-        
+
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
@@ -170,7 +172,9 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
         self.max_retries = 3
 
         # Extract location filtering config
-        self.use_location_filter = config_entry.data.get(CONF_USE_LOCATION_FILTER, False)
+        self.use_location_filter = config_entry.data.get(
+            CONF_USE_LOCATION_FILTER, False
+        )
         self.lat = config_entry.data.get(CONF_LOCATION_LAT)
         self.lon = config_entry.data.get(CONF_LOCATION_LON)
         self.distance = config_entry.data.get(CONF_DISTANCE, DEFAULT_DISTANCE)
@@ -206,12 +210,10 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                         "Fetching stations within %s meters of %.6f, %.6f",
                         self.distance,
                         self.lat,
-                        self.lon
+                        self.lon,
                     )
                     stations = await self.client.get_stations_by_location(
-                        float(self.lat),
-                        float(self.lon),
-                        int(self.distance)
+                        float(self.lat), float(self.lon), int(self.distance)
                     )
                 else:
                     _LOGGER.info("Fetching all stations")

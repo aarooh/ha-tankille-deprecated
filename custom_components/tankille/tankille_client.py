@@ -66,7 +66,7 @@ class TankilleClient:
         """Load tokens from local file if available."""
         if self._tokens_loaded:
             return
-            
+
         if os.path.exists(self._token_file):
             try:
                 async with aiofiles.open(self._token_file, "r") as f:
@@ -77,7 +77,7 @@ class TankilleClient:
                     self.token_cache = data.get("token_cache", self.token_cache)
             except Exception as e:
                 _LOGGER.error("Error loading tokens from file: %s", e)
-        
+
         self._tokens_loaded = True
 
     async def _save_tokens_to_file(self):
@@ -88,7 +88,7 @@ class TankilleClient:
                 "refresh_token": self.refresh_token,
                 "token_cache": self.token_cache,
             }
-            
+
             async with aiofiles.open(self._token_file, "w") as f:
                 await f.write(json.dumps(data))
         except Exception as e:
@@ -99,7 +99,7 @@ class TankilleClient:
         if self.session is None:
             self.session = aiohttp.ClientSession()
         return self.session
-    
+
     async def close(self):
         """Close the client session."""
         if self.session and not self.session.closed:
@@ -109,7 +109,7 @@ class TankilleClient:
     async def _auth_async(self):
         """Authenticate user if refresh token exists."""
         await self._load_tokens_from_file()
-        
+
         if not self.refresh_token:
             raise AuthenticationError("No refresh token available. Please login first.")
 
@@ -195,7 +195,7 @@ class TankilleClient:
 
         Args:
             email: User email
-            password: User password  
+            password: User password
             force: Force login even if already logged in
 
         Returns:
@@ -206,7 +206,7 @@ class TankilleClient:
         """
         # Load tokens before checking if logged in
         await self._load_tokens_from_file()
-        
+
         login_options = {"email": email, "password": password, "force": force}
 
         if not email or not password:

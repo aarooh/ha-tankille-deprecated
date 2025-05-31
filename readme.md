@@ -5,6 +5,7 @@
 [![GitHub License](https://img.shields.io/github/license/aarooh/hacs-tankille.svg)](https://github.com/aarooh/hacs-tankille/blob/main/LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2023.1+-blue.svg)](https://www.home-assistant.io/)
 [![GitHub Issues](https://img.shields.io/github/issues/aarooh/hacs-tankille.svg)](https://github.com/aarooh/hacs-tankille/issues)
+[![Validate](https://github.com/aarooh/hacs-tankille/actions/workflows/validate.yml/badge.svg)](https://github.com/aarooh/hacs-tankille/actions/workflows/validate.yml)
 
 <p align="left">
   <img src="images/logo.png" alt="Tankille Logo" width="200"/>
