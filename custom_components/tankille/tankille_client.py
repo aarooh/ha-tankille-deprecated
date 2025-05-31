@@ -58,8 +58,6 @@ class TankilleClient:
 
         self.session = session
         self._token_file = ".tankille_tokens.json"
-        # Don't load tokens in __init__ since it's synchronous
-        # We'll load them when needed in async methods
         self._tokens_loaded = False
 
     async def _load_tokens_from_file(self):
