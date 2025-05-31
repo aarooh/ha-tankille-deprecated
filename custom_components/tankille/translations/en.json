@@ -1,46 +1,82 @@
 {
-    "config": {
-      "step": {
-        "user": {
-          "title": "Connect to Tankille",
-          "description": "Set up Tankille integration to track fuel prices in Finland",
-          "data": {
-            "email": "Email",
-            "password": "Password",
-            "scan_interval": "Update interval (seconds)"
-          }
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Tankille",
+        "description": "Set up Tankille integration to track fuel prices in Finland",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "scan_interval": "Update interval (seconds)",
+          "use_location_filter": "Filter stations by location",
+          "lat": "Latitude",
+          "lon": "Longitude",
+          "distance": "Search radius (meters, 5000 = 5 km)"
         }
-      },
-      "error": {
-        "cannot_connect": "Failed to connect, please try again",
-        "invalid_auth": "Invalid authentication",
-        "unknown": "Unexpected error"
-      },
-      "abort": {
-        "already_configured": "Account is already configured"
       }
     },
-    "entity": {
-      "sensor": {
-        "fuel_price": {
-          "name": "{station_name} {fuel_type}",
-          "state_attributes": {
-            "station_name": "Station Name",
-            "brand": "Brand",
-            "chain": "Chain",
-            "address": "Address",
-            "city": "City",
-            "street": "Street",
-            "zipcode": "Zipcode",
-            "updated": "Last Updated",
-            "latitude": "Latitude",
-            "longitude": "Longitude",
-            "price_updated": "Price Updated",
-            "price_reporter": "Price Reporter",
-            "price_delta": "Price Change",
-            "available_fuels": "Available Fuels"
+    "error": {
+      "cannot_connect": "Failed to connect, please try again",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error",
+      "invalid_latitude": "Invalid latitude. Must be between -90 and 90",
+      "invalid_longitude": "Invalid longitude. Must be between -180 and 180",
+      "invalid_distance": "Invalid distance. Must be between 1000 and 50000 meters",
+      "invalid_input": "Invalid input format"
+    },
+    "abort": {
+      "already_configured": "Account is already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "fuel_price": {
+        "name": "{station_name} {fuel_type}",
+        "state_attributes": {
+          "station_name": {
+            "name": "Station Name"
+          },
+          "brand": {
+            "name": "Brand"
+          },
+          "chain": {
+            "name": "Chain"
+          },
+          "address": {
+            "name": "Address"
+          },
+          "city": {
+            "name": "City"
+          },
+          "street": {
+            "name": "Street"
+          },
+          "zipcode": {
+            "name": "Zipcode"
+          },
+          "updated": {
+            "name": "Last Updated"
+          },
+          "latitude": {
+            "name": "Latitude"
+          },
+          "longitude": {
+            "name": "Longitude"
+          },
+          "price_updated": {
+            "name": "Price Updated"
+          },
+          "price_reporter": {
+            "name": "Price Reporter"
+          },
+          "price_delta": {
+            "name": "Price Change"
+          },
+          "available_fuels": {
+            "name": "Available Fuels"
           }
         }
       }
     }
   }
+}
