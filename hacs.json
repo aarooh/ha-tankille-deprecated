@@ -1,7 +1,8 @@
 {
-    "name": "Tankille",
-    "render_readme": true,
-    "domain": "tankille",
-    "documentation": "https://github.com/aarooh/hacs-tankille",
-    "issue_tracker": "https://github.com/aarooh/hacs-tankille/issues"
-  }
+  "name": "Tankille",
+  "render_readme": true,
+  "domain": "tankille",
+  "documentation": "https://github.com/aarooh/hacs-tankille",
+  "issue_tracker": "https://github.com/aarooh/hacs-tankille/issues",
+  "icon": "images/logo.png"
+}
