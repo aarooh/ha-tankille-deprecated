@@ -2,6 +2,8 @@
   "domain": "tankille",
   "name": "Tankille",
   "documentation": "https://github.com/aarooh/hacs-tankille",
+  "issue_tracker": "https://github.com/aarooh/hacs-tankille/issues",
+  "codeowners": ["@aarooh", "@dataxoaaro"],
   "dependencies": [],
   "requirements": ["requests>=2.25.0", "aiohttp>=3.7.4", "aiofiles>=0.8.0"],
   "config_flow": true,
