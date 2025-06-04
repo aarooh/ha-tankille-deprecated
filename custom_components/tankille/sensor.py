@@ -166,7 +166,6 @@ async def async_setup_entry(
 
         # Create sensors only for selected fuel types that are available at the station
         for fuel_type_code in station_data.get("fuels", []):
-            fuel_info = station_data["fuels"].get(fuel_type_code, {})
             if fuel_type_code in FUEL_TYPES and fuel_type_code in selected_fuels:
                 fuel_price_sensor_unique_id = f"{DOMAIN}_{station_id}_{fuel_type_code}"
                 active_unique_ids.add(fuel_price_sensor_unique_id)
@@ -261,7 +260,10 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         ]
 
         # If fuel type was explicitly selected in config, enable it regardless
-        config_fuels_str = coordinator.config_entry.data.get(CONF_FUELS, "")
+        # Ensure we read from options if available, falling back to data
+        config_fuels_str = coordinator.config_entry.options.get(
+            CONF_FUELS, coordinator.config_entry.data.get(CONF_FUELS, "")
+        )
         if isinstance(config_fuels_str, str):
             config_fuels = [f.strip() for f in config_fuels_str.split(",") if f.strip()]
         else:
