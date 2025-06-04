@@ -95,7 +95,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Tankille sensor entries."""
+    """Set up Tankille sensor entries with clean slate approach."""
     client: TankilleClient = hass.data[DOMAIN][config_entry.entry_id]["client"]
     coordinator: TankilleDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
@@ -106,7 +106,28 @@ async def async_setup_entry(
         """Get configuration value from options (preferred) or data (fallback)."""
         return config_entry.options.get(key, config_entry.data.get(key, default))
 
-    # Get ignored chains from config entry
+    _LOGGER.info("Starting Tankille sensor setup with clean slate approach")
+
+    # STEP 1: Clean slate - Remove ALL existing entities for this config entry
+    entity_registry = er.async_get(hass)
+    existing_entities = er.async_entries_for_config_entry(
+        entity_registry, config_entry.entry_id
+    )
+    
+    entities_removed = 0
+    for entity_entry in existing_entities:
+        _LOGGER.debug(
+            "Removing existing entity: %s (%s)",
+            entity_entry.entity_id,
+            entity_entry.unique_id,
+        )
+        entity_registry.async_remove_entity(entity_entry.entity_id)
+        entities_removed += 1
+    
+    if entities_removed > 0:
+        _LOGGER.info("Clean slate: Removed %d existing entities", entities_removed)
+
+    # STEP 2: Get current configuration
     ignored_chains_str = get_config_value(CONF_IGNORED_CHAINS, "")
     ignored_chains = [
         chain.strip().lower()
@@ -114,7 +135,6 @@ async def async_setup_entry(
         if chain.strip()
     ]
 
-    # Get selected fuel types from config entry
     selected_fuels_config = get_config_value(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
     if isinstance(selected_fuels_config, str):
         selected_fuels = [f.strip() for f in selected_fuels_config.split(",") if f.strip()]
@@ -124,22 +144,26 @@ async def async_setup_entry(
         selected_fuels = DEFAULT_FUEL_TYPES
 
     _LOGGER.info(
-        "Setting up sensors with ignored chains: %s, selected fuels: %s",
+        "Configuration: ignored_chains=%s, selected_fuels=%s",
         ignored_chains,
         selected_fuels,
     )
 
+    # STEP 3: Ensure we have station data
     all_stations_data = coordinator.data
     if not all_stations_data:
-        _LOGGER.warning("No station data available from coordinator, requesting refresh.")
+        _LOGGER.warning("No station data available, requesting refresh...")
         await coordinator.async_request_refresh()
-        all_stations_data = coordinator.data # Re-fetch after refresh
+        all_stations_data = coordinator.data
         if not all_stations_data:
-            _LOGGER.error("Still no station data after refresh, cannot set up sensors.")
+            _LOGGER.error("Still no station data after refresh, aborting setup")
             return
 
+    # STEP 4: Create all new entities based on current configuration
     entities_to_add: list[SensorEntity] = []
-    active_unique_ids: set[str] = set()
+    stations_processed = 0
+    stations_ignored = 0
+    fuel_sensors_created = 0
 
     for station_id, station_data in all_stations_data.items():
         station_name = station_data.get("name", "Unknown Station")
@@ -147,73 +171,216 @@ async def async_setup_entry(
         station_chain = station_data.get("chain", "")
 
         # Check if station should be ignored
-        if is_station_ignored(
-            station_name, station_brand, station_chain, ignored_chains
-        ):
+        if is_station_ignored(station_name, station_brand, station_chain, ignored_chains):
             _LOGGER.debug(
-                "Skipping station '%s' (brand: %s, chain: %s) - matches ignored filter",
+                "Ignoring station '%s' (brand: %s, chain: %s)",
                 station_name,
                 station_brand,
                 station_chain,
             )
+            stations_ignored += 1
             continue
 
-        # Add unique ID for the station update sensor
-        station_update_sensor_unique_id = f"{DOMAIN}_{station_id}_last_updated"
-        active_unique_ids.add(station_update_sensor_unique_id)
+        stations_processed += 1
+
+        # Always add the station update sensor
         entities_to_add.append(TankilleStationUpdateSensor(coordinator, station_id))
 
-        # Create sensors only for selected fuel types that are available at the station
-        for fuel_type_code in station_data.get("fuels", []):
+        # Add fuel price sensors for selected fuel types
+        station_fuel_count = 0
+        available_fuels = station_data.get("fuels", [])
+        
+        for fuel_type_code in available_fuels:
             if fuel_type_code in FUEL_TYPES and fuel_type_code in selected_fuels:
-                fuel_price_sensor_unique_id = f"{DOMAIN}_{station_id}_{fuel_type_code}"
-                active_unique_ids.add(fuel_price_sensor_unique_id)
                 entities_to_add.append(
                     TankilleFuelPriceSensor(coordinator, station_id, fuel_type_code)
                 )
-            elif fuel_type_code in FUEL_TYPES and fuel_type_code not in selected_fuels:
-                _LOGGER.debug(
-                    "Skipping fuel type %s for station %s - not in selected fuels list: %s",
-                    fuel_type_code,
-                    station_name,
-                    selected_fuels
-                )
+                station_fuel_count += 1
+                fuel_sensors_created += 1
 
-    # Remove stale entities more aggressively
-    entity_registry = er.async_get(hass)
-    current_hass_entities = er.async_entries_for_config_entry(
-        entity_registry, config_entry.entry_id
-    )
-
-    stale_entities_to_remove: list[str] = []
-    for entity_entry in current_hass_entities:
-        if entity_entry.unique_id not in active_unique_ids:
-            _LOGGER.info(
-                "Marking stale entity for removal: %s (%s)",
-                entity_entry.entity_id,
-                entity_entry.unique_id,
-            )
-            stale_entities_to_remove.append(entity_entry.entity_id)
-
-    # Remove stale entities
-    for entity_id in stale_entities_to_remove:
-        entity_registry.async_remove_entity(entity_id)
-        
-    if stale_entities_to_remove:
-        _LOGGER.info(
-            "Removed %d stale entities. Devices will be cleaned up by HA if no entities remain",
-            len(stale_entities_to_remove),
+        _LOGGER.debug(
+            "Station '%s': %d fuel sensors (available: %s, selected: %s)",
+            station_name,
+            station_fuel_count,
+            available_fuels,
+            selected_fuels,
         )
 
+    # STEP 5: Add all the new entities
+    total_entities = len(entities_to_add)
+    
     _LOGGER.info(
-        "Adding %d entities for %d stations (filtered by %d ignored chains, %d selected fuel types)",
-        len(entities_to_add),
-        len([e for e in entities_to_add if isinstance(e, TankilleStationUpdateSensor)]),
-        len(ignored_chains),
-        len(selected_fuels),
+        "Setup complete: %d stations processed, %d ignored, creating %d entities (%d station sensors + %d fuel sensors)",
+        stations_processed,
+        stations_ignored,
+        total_entities,
+        stations_processed,  # One update sensor per station
+        fuel_sensors_created,
     )
 
-    async_add_entities(entities_to_add, True)
+    if entities_to_add:
+        async_add_entities(entities_to_add, True)
+        _LOGGER.info("Successfully added %d new entities", total_entities)
+    else:
+        _LOGGER.warning("No entities to add - check your configuration")
+
+
+# Update the async_update_listener to ensure proper reload
+async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update with clean reload."""
+    _LOGGER.info("Configuration updated, performing clean reload of Tankille integration")
+    
+    # Optional: Refresh coordinator data before reload
+    if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
+        coordinator = hass.data[DOMAIN][entry.entry_id].get("coordinator")
+        if coordinator:
+            _LOGGER.debug("Refreshing coordinator data before reload")
+            try:
+                await coordinator.async_request_refresh()
+            except Exception as err:
+                _LOGGER.warning("Failed to refresh coordinator data: %s", err)
+    
+    # Reload the entire integration
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+# Also update the coordinator to include the helper method
+class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching Tankille data."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: TankilleClient,
+        scan_interval: timedelta,
+        config_entry: ConfigEntry,
+    ) -> None:
+        """Initialize global Tankille data updater."""
+        self.client = client
+        self.config_entry = config_entry
+        self.retry_count = 0
+        self.max_retries = 3
+
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=scan_interval,
+        )
+
+    def get_config_value(self, key: str, default=None):
+        """Get configuration value from options (preferred) or data (fallback)."""
+        return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
+
+    async def _async_update_data(self) -> Dict[str, Any]:
+        """Fetch data from Tankille API."""
+        # Reset retry count if this is a scheduled update
+        if self.retry_count >= self.max_retries:
+            self.retry_count = 0
+
+        # Get current configuration values using helper method
+        use_location_filter = self.get_config_value(CONF_USE_LOCATION_FILTER, False)
+        lat = self.get_config_value(CONF_LOCATION_LAT)
+        lon = self.get_config_value(CONF_LOCATION_LON)
+        distance = self.get_config_value(CONF_DISTANCE, DEFAULT_DISTANCE)
+
+        _LOGGER.debug(
+            "Updating data with location filter: %s, ignored chains: %s, fuels: %s",
+            use_location_filter,
+            self.get_config_value(CONF_IGNORED_CHAINS, "None"),
+            self.get_config_value(CONF_FUELS, "Default"),
+        )
+
+        try:
+            # Authentication check
+            if not self.client.token:
+                _LOGGER.info("No authentication token, attempting to refresh login")
+                try:
+                    await self.client._auth_async()
+                    _LOGGER.info("Successfully refreshed authentication token")
+                except (AuthenticationError, ApiError) as err:
+                    _LOGGER.error("Failed to refresh authentication: %s", err)
+                    raise UpdateFailed(f"Authentication error: {err}")
+
+            # Fetch stations based on configuration
+            try:
+                if use_location_filter and lat and lon:
+                    _LOGGER.debug(
+                        "Fetching stations within %s meters of %.6f, %.6f",
+                        distance,
+                        float(lat),
+                        float(lon),
+                    )
+                    stations = await self.client.get_stations_by_location(
+                        float(lat), float(lon), int(distance)
+                    )
+                else:
+                    _LOGGER.debug("Fetching all stations")
+                    stations = await self.client.get_stations()
+            except asyncio.TimeoutError:
+                self.retry_count += 1
+                _LOGGER.warning(
+                    "Timeout while fetching stations (attempt %s of %s)",
+                    self.retry_count,
+                    self.max_retries,
+                )
+                if self.retry_count < self.max_retries:
+                    await asyncio.sleep(2**self.retry_count)
+                    return await self._async_update_data()
+                raise UpdateFailed("Repeated timeouts while fetching station data")
+
+            # Process stations
+            if not stations:
+                _LOGGER.warning("No stations returned from API")
+                return {}
+
+            result = {}
+            for station in stations:
+                if "_id" not in station:
+                    _LOGGER.warning("Station missing ID: %s", station)
+                    continue
+
+                result[station["_id"]] = station
+
+            _LOGGER.debug(
+                "Successfully fetched %s stations with %s total fuel prices",
+                len(result),
+                sum(len(station.get("price", [])) for station in result.values()),
+            )
+
+            self.retry_count = 0
+            return result
+
+        except AuthenticationError as err:
+            _LOGGER.error("Authentication error during data update: %s", err)
+            try:
+                _LOGGER.info("Attempting to refresh authentication token")
+                await self.client._auth_async()
+                _LOGGER.info("Re-authentication successful, retrying data update")
+                return await self._async_update_data()
+            except Exception as auth_err:
+                _LOGGER.error("Failed to re-authenticate: %s", auth_err)
+                raise UpdateFailed(f"Authentication failed: {err}")
+
+        except ApiError as err:
+            self.retry_count += 1
+            _LOGGER.error(
+                "API error during data update (attempt %s of %s): %s",
+                self.retry_count,
+                self.max_retries,
+                err,
+            )
+
+            if self.retry_count < self.max_retries:
+                await asyncio.sleep(2**self.retry_count)
+                return await self._async_update_data()
+
+            raise UpdateFailed(f"Repeated API errors: {err}")
+
+        except Exception as err:
+            _LOGGER.exception("Unexpected error during data update: %s", err)
+            raise UpdateFailed(f"Unexpected error: {err}")
+
 class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
     """Represents a fuel price sensor from Tankille."""
 
