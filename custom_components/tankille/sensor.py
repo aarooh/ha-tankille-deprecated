@@ -15,7 +15,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CURRENCY_EURO
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback, async_get_current_platform
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
 from homeassistant.helpers import entity_registry as er
 
@@ -50,6 +50,9 @@ from .const import (
 from .tankille_client import TankilleClient
 
 _LOGGER = logging.getLogger(__name__)
+
+# Global reference to the add_entities callback for dynamic entity management
+_add_entities_callback = None
 
 
 def is_station_ignored(
@@ -95,7 +98,10 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Tankille sensor entries with proper entity management."""
+    """Set up Tankille sensor entries."""
+    global _add_entities_callback
+    _add_entities_callback = async_add_entities
+    
     client: TankilleClient = hass.data[DOMAIN][config_entry.entry_id]["client"]
     coordinator: TankilleDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
@@ -108,10 +114,7 @@ async def async_setup_entry(
 
     _LOGGER.info("Starting Tankille sensor setup")
 
-    # STEP 1: Clean up existing entities that no longer match configuration
-    await _cleanup_obsolete_entities(hass, config_entry, get_config_value)
-
-    # STEP 2: Get current configuration
+    # Get current configuration
     ignored_chains_str = get_config_value(CONF_IGNORED_CHAINS, "")
     ignored_chains = [
         chain.strip().lower()
@@ -133,7 +136,7 @@ async def async_setup_entry(
         selected_fuels,
     )
 
-    # STEP 3: Ensure we have station data
+    # Ensure we have station data
     all_stations_data = coordinator.data
     if not all_stations_data:
         _LOGGER.warning("No station data available, requesting refresh...")
@@ -143,18 +146,11 @@ async def async_setup_entry(
             _LOGGER.error("Still no station data after refresh, aborting setup")
             return
 
-    # STEP 4: Create entities based on current configuration
+    # Create entities based on current configuration
     entities_to_add: list[SensorEntity] = []
     stations_processed = 0
     stations_ignored = 0
     fuel_sensors_created = 0
-
-    # Get existing entities to avoid duplicates
-    entity_registry = er.async_get(hass)
-    existing_entities = er.async_entries_for_config_entry(
-        entity_registry, config_entry.entry_id
-    )
-    existing_unique_ids = {entity.unique_id for entity in existing_entities}
 
     for station_id, station_data in all_stations_data.items():
         station_name = station_data.get("name", "Unknown Station")
@@ -174,10 +170,8 @@ async def async_setup_entry(
 
         stations_processed += 1
 
-        # Add station update sensor if it doesn't exist
-        update_sensor_id = f"{DOMAIN}_{station_id}_last_updated"
-        if update_sensor_id not in existing_unique_ids:
-            entities_to_add.append(TankilleStationUpdateSensor(coordinator, station_id))
+        # Add station update sensor
+        entities_to_add.append(TankilleStationUpdateSensor(coordinator, station_id))
 
         # Add fuel price sensors for selected fuel types
         station_fuel_count = 0
@@ -185,27 +179,25 @@ async def async_setup_entry(
         
         for fuel_type_code in available_fuels:
             if fuel_type_code in FUEL_TYPES and fuel_type_code in selected_fuels:
-                fuel_sensor_id = f"{DOMAIN}_{station_id}_{fuel_type_code}"
-                if fuel_sensor_id not in existing_unique_ids:
-                    entities_to_add.append(
-                        TankilleFuelPriceSensor(coordinator, station_id, fuel_type_code)
-                    )
-                    station_fuel_count += 1
-                    fuel_sensors_created += 1
+                entities_to_add.append(
+                    TankilleFuelPriceSensor(coordinator, station_id, fuel_type_code)
+                )
+                station_fuel_count += 1
+                fuel_sensors_created += 1
 
         _LOGGER.debug(
-            "Station '%s': %d new fuel sensors (available: %s, selected: %s)",
+            "Station '%s': %d fuel sensors (available: %s, selected: %s)",
             station_name,
             station_fuel_count,
             available_fuels,
             selected_fuels,
         )
 
-    # STEP 5: Add all the new entities
+    # Add all the entities
     total_entities = len(entities_to_add)
     
     _LOGGER.info(
-        "Setup complete: %d stations processed, %d ignored, creating %d new entities",
+        "Setup complete: %d stations processed, %d ignored, creating %d entities",
         stations_processed,
         stations_ignored,
         total_entities,
@@ -213,24 +205,31 @@ async def async_setup_entry(
 
     if entities_to_add:
         async_add_entities(entities_to_add, True)
-        _LOGGER.info("Successfully added %d new entities", total_entities)
+        _LOGGER.info("Successfully added %d entities", total_entities)
     else:
-        _LOGGER.info("No new entities to add")
+        _LOGGER.info("No entities to add")
 
 
-async def _cleanup_obsolete_entities(
-    hass: HomeAssistant, 
-    config_entry: ConfigEntry, 
-    get_config_value
+async def handle_config_update(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    coordinator: TankilleDataUpdateCoordinator,
 ) -> None:
-    """Remove entities that no longer match the current configuration."""
+    """Handle configuration updates by managing entities dynamically."""
+    global _add_entities_callback
+    
+    # Helper function to get config values (options take precedence over data)
+    def get_config_value(key: str, default=None):
+        """Get configuration value from options (preferred) or data (fallback)."""
+        return config_entry.options.get(key, config_entry.data.get(key, default))
+
+    _LOGGER.info("Handling configuration update")
+
+    # Step 1: Clean up obsolete entities
     entity_registry = er.async_get(hass)
     existing_entities = er.async_entries_for_config_entry(
         entity_registry, config_entry.entry_id
     )
-    
-    if not existing_entities:
-        return
     
     # Get current configuration
     ignored_chains_str = get_config_value(CONF_IGNORED_CHAINS, "")
@@ -248,19 +247,15 @@ async def _cleanup_obsolete_entities(
     else:
         selected_fuels = DEFAULT_FUEL_TYPES
 
-    # Get coordinator to access station data
-    coordinator: TankilleDataUpdateCoordinator = hass.data[DOMAIN][
-        config_entry.entry_id
-    ]["coordinator"]
-    
     entities_to_remove = []
+    existing_unique_ids = set()
     
     for entity_entry in existing_entities:
-        should_remove = False
         unique_id = entity_entry.unique_id
+        existing_unique_ids.add(unique_id)
+        should_remove = False
         
         # Parse the unique_id to get station_id and fuel_type
-        # Format: "tankille_{station_id}_{fuel_type}" or "tankille_{station_id}_last_updated"
         if unique_id.startswith(f"{DOMAIN}_"):
             parts = unique_id[len(f"{DOMAIN}_"):].split("_")
             if len(parts) >= 2:
@@ -302,6 +297,48 @@ async def _cleanup_obsolete_entities(
                 entity_entry.unique_id,
             )
             entity_registry.async_remove_entity(entity_entry.entity_id)
+            existing_unique_ids.discard(entity_entry.unique_id)
+
+    # Step 2: Create new entities that don't exist yet
+    if not coordinator.data:
+        _LOGGER.warning("No station data available for creating new entities")
+        return
+
+    new_entities_to_add = []
+    
+    for station_id, station_data in coordinator.data.items():
+        station_name = station_data.get("name", "Unknown Station")
+        station_brand = station_data.get("brand", "")
+        station_chain = station_data.get("chain", "")
+
+        # Check if station should be ignored
+        if is_station_ignored(station_name, station_brand, station_chain, ignored_chains):
+            continue
+
+        # Add station update sensor if it doesn't exist
+        update_sensor_id = f"{DOMAIN}_{station_id}_last_updated"
+        if update_sensor_id not in existing_unique_ids:
+            new_entities_to_add.append(TankilleStationUpdateSensor(coordinator, station_id))
+
+        # Add fuel price sensors for selected fuel types
+        available_fuels = station_data.get("fuels", [])
+        
+        for fuel_type_code in available_fuels:
+            if fuel_type_code in FUEL_TYPES and fuel_type_code in selected_fuels:
+                fuel_sensor_id = f"{DOMAIN}_{station_id}_{fuel_type_code}"
+                if fuel_sensor_id not in existing_unique_ids:
+                    new_entities_to_add.append(
+                        TankilleFuelPriceSensor(coordinator, station_id, fuel_type_code)
+                    )
+
+    # Add new entities
+    if new_entities_to_add and _add_entities_callback:
+        _LOGGER.info("Adding %d new entities due to configuration changes", len(new_entities_to_add))
+        _add_entities_callback(new_entities_to_add, True)
+    elif new_entities_to_add:
+        _LOGGER.warning("Cannot add new entities - no callback available")
+    else:
+        _LOGGER.info("No new entities needed")
 
 
 class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):

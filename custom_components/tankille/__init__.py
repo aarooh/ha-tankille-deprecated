@@ -150,14 +150,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle options update."""
-    _LOGGER.debug("Configuration options updated, reloading Tankille integration")
+    """Handle options update without full reload."""
+    _LOGGER.debug("Configuration options updated, managing entities dynamically")
     
-    # Before reloading, we need to ensure that entity cleanup happens properly
-    # The reload process will call async_unload_entry followed by async_setup_entry
-    # The new async_setup_entry will handle the cleanup of obsolete entities
+    coordinator: TankilleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     
-    await hass.config_entries.async_reload(entry.entry_id)
+    # Update the coordinator's config entry reference
+    coordinator.config_entry = entry
+    
+    # Handle entity management directly without reload
+    from .sensor import handle_config_update
+    await handle_config_update(hass, entry, coordinator)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
