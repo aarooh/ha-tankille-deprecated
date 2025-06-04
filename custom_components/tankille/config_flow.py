@@ -182,23 +182,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     user_input[CONF_FUELS] = ",".join(user_input[CONF_FUELS])
 
                 if not errors:
-                    # Update the config entry data (not just options)
-                    # This follows the pattern from the competing solution
-                    updated_data = {**self.config_entry.data, **user_input}
-                    self.hass.config_entries.async_update_entry(
-                        self.config_entry, data=updated_data
-                    )
-                    return self.async_create_entry(title="", data={})
+                    # Store options in the options field, not data
+                    return self.async_create_entry(title="", data=user_input)
 
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception in options flow")
                 errors["base"] = "unknown"
 
-        # Get current values, including from both data and options for backward compatibility
+        # Get current values from options OR data (fallback for backward compatibility)
         def get_current_value(key, default):
-            return self.config_entry.options.get(key) or self.config_entry.data.get(
-                key, default
-            )
+            # Check options first, then data
+            return self.config_entry.options.get(key, 
+                   self.config_entry.data.get(key, default))
 
         current_scan_interval = get_current_value(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL

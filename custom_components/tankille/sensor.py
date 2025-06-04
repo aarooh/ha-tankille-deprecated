@@ -101,11 +101,13 @@ async def async_setup_entry(
         config_entry.entry_id
     ]["coordinator"]
 
-    # Get ignored chains from config entry, defaulting to empty string then splitting
-    # Ensure we read from options if available, falling back to data
-    ignored_chains_str = config_entry.options.get(
-        CONF_IGNORED_CHAINS, config_entry.data.get(CONF_IGNORED_CHAINS, "")
-    )
+    # Helper function to get config values (options take precedence over data)
+    def get_config_value(key: str, default=None):
+        """Get configuration value from options (preferred) or data (fallback)."""
+        return config_entry.options.get(key, config_entry.data.get(key, default))
+
+    # Get ignored chains from config entry
+    ignored_chains_str = get_config_value(CONF_IGNORED_CHAINS, "")
     ignored_chains = [
         chain.strip().lower()
         for chain in ignored_chains_str.split(",")
@@ -113,10 +115,7 @@ async def async_setup_entry(
     ]
 
     # Get selected fuel types from config entry
-    # Ensure we read from options if available, falling back to data
-    selected_fuels_config = config_entry.options.get(
-        CONF_FUELS, config_entry.data.get(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
-    )
+    selected_fuels_config = get_config_value(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
     if isinstance(selected_fuels_config, str):
         selected_fuels = [f.strip() for f in selected_fuels_config.split(",") if f.strip()]
     elif isinstance(selected_fuels_config, list):
@@ -179,10 +178,8 @@ async def async_setup_entry(
                     station_name,
                     selected_fuels
                 )
-            # else: # Fuel type from station not in our master FUEL_TYPES list
-                # _LOGGER.debug("Unknown fuel type %s at station %s", fuel_type_code, station_name)
 
-    # Remove stale entities
+    # Remove stale entities more aggressively
     entity_registry = er.async_get(hass)
     current_hass_entities = er.async_entries_for_config_entry(
         entity_registry, config_entry.entry_id
@@ -191,26 +188,25 @@ async def async_setup_entry(
     stale_entities_to_remove: list[str] = []
     for entity_entry in current_hass_entities:
         if entity_entry.unique_id not in active_unique_ids:
-            _LOGGER.debug(
-                "Removing stale entity: %s (%s)",
+            _LOGGER.info(
+                "Marking stale entity for removal: %s (%s)",
                 entity_entry.entity_id,
                 entity_entry.unique_id,
             )
             stale_entities_to_remove.append(entity_entry.entity_id)
 
+    # Remove stale entities
     for entity_id in stale_entities_to_remove:
         entity_registry.async_remove_entity(entity_id)
         
-    # Log device cleanup attempt (devices are removed if all their entities are gone)
     if stale_entities_to_remove:
         _LOGGER.info(
-            "Removed %d stale entities. Associated devices will be cleaned up by HA if no entities remain",
+            "Removed %d stale entities. Devices will be cleaned up by HA if no entities remain",
             len(stale_entities_to_remove),
         )
 
     _LOGGER.info(
-        "Identified %d active unique IDs. Attempting to add/update %d entities for %d stations (filtered by %d ignored chains, %d selected fuel types)",
-        len(active_unique_ids),
+        "Adding %d entities for %d stations (filtered by %d ignored chains, %d selected fuel types)",
         len(entities_to_add),
         len([e for e in entities_to_add if isinstance(e, TankilleStationUpdateSensor)]),
         len(ignored_chains),
@@ -218,8 +214,6 @@ async def async_setup_entry(
     )
 
     async_add_entities(entities_to_add, True)
-
-
 class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
     """Represents a fuel price sensor from Tankille."""
 

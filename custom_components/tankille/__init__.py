@@ -188,22 +188,6 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
         self.retry_count = 0
         self.max_retries = 3
 
-        # Extract location filtering config
-        self.use_location_filter = config_entry.data.get(
-            CONF_USE_LOCATION_FILTER, False
-        )
-        self.lat = config_entry.data.get(CONF_LOCATION_LAT)
-        self.lon = config_entry.data.get(CONF_LOCATION_LON)
-        self.distance = config_entry.data.get(CONF_DISTANCE, DEFAULT_DISTANCE)
-
-        # Log current configuration for debugging
-        _LOGGER.debug(
-            "Tankille coordinator initialized with location filter: %s, ignored chains: %s, fuels: %s",
-            self.use_location_filter,
-            config_entry.data.get(CONF_IGNORED_CHAINS, "None"),
-            config_entry.data.get(CONF_FUELS, "Default"),
-        )
-
         super().__init__(
             hass,
             _LOGGER,
@@ -211,11 +195,29 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=scan_interval,
         )
 
+    def get_config_value(self, key: str, default=None):
+        """Get configuration value from options (preferred) or data (fallback)."""
+        return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
+
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from Tankille API."""
         # Reset retry count if this is a scheduled update
         if self.retry_count >= self.max_retries:
             self.retry_count = 0
+
+        # Get current configuration values
+        use_location_filter = self.get_config_value(CONF_USE_LOCATION_FILTER, False)
+        lat = self.get_config_value(CONF_LOCATION_LAT)
+        lon = self.get_config_value(CONF_LOCATION_LON)
+        distance = self.get_config_value(CONF_DISTANCE, DEFAULT_DISTANCE)
+
+        # Log current configuration for debugging
+        _LOGGER.debug(
+            "Tankille coordinator updating with location filter: %s, ignored chains: %s, fuels: %s",
+            use_location_filter,
+            self.get_config_value(CONF_IGNORED_CHAINS, "None"),
+            self.get_config_value(CONF_FUELS, "Default"),
+        )
 
         try:
             # First check if we need to refresh authentication
@@ -230,15 +232,15 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
 
             # Get stations based on configuration
             try:
-                if self.use_location_filter and self.lat and self.lon:
+                if use_location_filter and lat and lon:
                     _LOGGER.info(
                         "Fetching stations within %s meters of %.6f, %.6f",
-                        self.distance,
-                        self.lat,
-                        self.lon,
+                        distance,
+                        float(lat),
+                        float(lon),
                     )
                     stations = await self.client.get_stations_by_location(
-                        float(self.lat), float(self.lon), int(self.distance)
+                        float(lat), float(lon), int(distance)
                     )
                 else:
                     _LOGGER.info("Fetching all stations")
