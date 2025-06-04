@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to Tankille",
-        "description": "Configure Tankille integration. Location filtering is strongly recommended to avoid creating hundreds of sensors.\n\nTip: Use 2-5 km radius in cities, 10-15 km in rural areas.",
+        "description": "Configure Tankille integration. Location filtering is strongly recommended to avoid creating hundreds of sensors.\n\nTip: Use 2-5 km radius in cities, 10-15 km in rural areas.\n\nYou can ignore specific gas station chains and select which fuel types to monitor.",
         "data": {
           "email": "Email",
           "password": "Password",
@@ -11,7 +11,9 @@
           "use_location_filter": "Filter stations by location",
           "lat": "Latitude",
           "lon": "Longitude",
-          "distance": "Search radius (meters, 5000 = 5 km)"
+          "distance": "Search radius (meters, 5000 = 5 km)",
+          "ignored_chains": "Ignored gas station chains (comma-separated, e.g., 'Neste, ABC')",
+          "fuels": "Fuel types to monitor"
         }
       }
     },
@@ -26,6 +28,30 @@
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_account%]"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure Tankille Options",
+        "description": "Update Tankille integration settings.\n\n• Ignored Chains: Comma-separated list of gas station chains to ignore (e.g., 'Neste, ABC, St1')\n• Fuel Types: Select which fuel types to monitor\n• Location: Adjust search area for nearby stations",
+        "data": {
+          "scan_interval": "Update interval (seconds)",
+          "use_location_filter": "Filter stations by location",
+          "lat": "Latitude",
+          "lon": "Longitude",
+          "distance": "Search radius (meters, 5000 = 5 km)",
+          "ignored_chains": "Ignored gas station chains (comma-separated)",
+          "fuels": "Fuel types to monitor"
+        }
+      }
+    },
+    "error": {
+      "invalid_latitude": "Invalid latitude. Must be between -90 and 90",
+      "invalid_longitude": "Invalid longitude. Must be between -180 and 180",
+      "invalid_distance": "Invalid distance. Must be between 1000 and 50000 meters",
+      "invalid_input": "Invalid input format",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
     }
   }
 }

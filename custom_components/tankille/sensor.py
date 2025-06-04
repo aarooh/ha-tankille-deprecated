@@ -42,48 +42,133 @@ from .const import (
     FUEL_TYPE_98_PLUS,
     FUEL_TYPE_DIESEL_PLUS,
     FUEL_TYPE_HVO,
+    CONF_IGNORED_CHAINS,
+    CONF_FUELS,
+    DEFAULT_FUEL_TYPES,
 )
+from .tankille_client import TankilleClient
 
 _LOGGER = logging.getLogger(__name__)
 
 
+def is_station_ignored(
+    station_name: str, station_brand: str, station_chain: str, ignored_chains: list[str]
+) -> bool:
+    """
+    Check if station should be ignored based on name, brand, or chain.
+
+    Uses partial matching (substring search) to catch variations like:
+    - "Neste" matches "Neste Express", "Neste Automat"
+    - "ABC" matches "ABC S-market", "ABC Automat"
+    - "Shell" matches "Shell Express", "Shell Select"
+
+    Args:
+        station_name: Station name (e.g., "Neste Vantaa Myyrmäki")
+        station_brand: Station brand (e.g., "Neste")
+        station_chain: Station chain (e.g., "Neste Oy")
+        ignored_chains: List of lowercase chain names to ignore
+
+    Returns:
+        True if station should be ignored, False otherwise
+    """
+    if not ignored_chains:
+        return False
+
+    station_name_lower = station_name.lower()
+    station_brand_lower = station_brand.lower()
+    station_chain_lower = station_chain.lower()
+
+    for ignored in ignored_chains:
+        if (
+            ignored in station_name_lower
+            or ignored in station_brand_lower
+            or ignored in station_chain_lower
+        ):
+            return True
+
+    return False
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Tankille sensor based on a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    """Set up Tankille sensor entries."""
+    client: TankilleClient = hass.data[DOMAIN][config_entry.entry_id]["client"]
+    coordinator: TankilleDataUpdateCoordinator = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]["coordinator"]
 
-    # Wait for the coordinator to have data
-    if not coordinator.data:
-        await coordinator.async_request_refresh()
+    # Get ignored chains from config entry, defaulting to empty string then splitting
+    ignored_chains_str = config_entry.data.get(CONF_IGNORED_CHAINS, "")
+    ignored_chains = [
+        chain.strip().lower()
+        for chain in ignored_chains_str.split(",")
+        if chain.strip()
+    ]
 
-    entities = []
-
-    # Process all stations from the coordinator
-    if coordinator.data:
-        for station_id, station_data in coordinator.data.items():
-            # Add station update sensor (automatically enabled)
-            _LOGGER.debug(
-                "Creating Last Updated sensor for station: %s",
-                station_data.get("name", station_id),
-            )
-            entities.append(TankilleStationUpdateSensor(coordinator, station_id))
-
-            for fuel_type in station_data.get("fuels", []):
-                if fuel_type in FUEL_TYPES:
-                    entities.append(
-                        TankilleFuelPriceSensor(coordinator, station_id, fuel_type)
-                    )
+    # Get selected fuel types from config entry
+    selected_fuels_str = config_entry.data.get(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
+    if isinstance(selected_fuels_str, str):
+        selected_fuels = [f.strip() for f in selected_fuels_str.split(",") if f.strip()]
+    else:
+        selected_fuels = selected_fuels_str or DEFAULT_FUEL_TYPES
 
     _LOGGER.info(
-        "Created %d entities (%d stations with Last Updated sensors)",
-        len(entities),
-        len([e for e in entities if isinstance(e, TankilleStationUpdateSensor)]),
+        "Setting up sensors with ignored chains: %s, selected fuels: %s",
+        ignored_chains,
+        selected_fuels,
     )
 
-    async_add_entities(entities, True)
+    all_stations_data = coordinator.data
+    if not all_stations_data:
+        await coordinator.async_request_refresh()
+
+    entities_to_add: list[SensorEntity] = []
+
+    for station_id, station_data in all_stations_data.items():
+        station_name = station_data.get("name", "Unknown Station")
+        station_brand = station_data.get("brand", "")
+        station_chain = station_data.get("chain", "")
+
+        # Check if station should be ignored
+        if is_station_ignored(
+            station_name, station_brand, station_chain, ignored_chains
+        ):
+            _LOGGER.debug(
+                "Skipping station '%s' (brand: %s, chain: %s) - matches ignored filter",
+                station_name,
+                station_brand,
+                station_chain,
+            )
+            continue
+
+        # Last updated sensor for the station (always create)
+        entities_to_add.append(TankilleStationUpdateSensor(coordinator, station_id))
+
+        # Create sensors only for selected fuel types that are available at the station
+        for fuel_type in station_data.get("fuels", []):
+            if fuel_type in FUEL_TYPES and fuel_type in selected_fuels:
+                entities_to_add.append(
+                    TankilleFuelPriceSensor(coordinator, station_id, fuel_type)
+                )
+            elif fuel_type in FUEL_TYPES and fuel_type not in selected_fuels:
+                _LOGGER.debug(
+                    "Skipping fuel type %s for station %s - not in selected fuels",
+                    fuel_type,
+                    station_name,
+                )
+
+    _LOGGER.info(
+        "Created %d entities for %d stations (filtered by %d ignored chains, %d selected fuel types)",
+        len(entities_to_add),
+        len([e for e in entities_to_add if isinstance(e, TankilleStationUpdateSensor)]),
+        len(ignored_chains),
+        len(selected_fuels),
+    )
+
+    async_add_entities(entities_to_add, True)
 
 
 class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
@@ -116,7 +201,7 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         fuel_name = FUEL_TYPE_NAMES.get(fuel_type, fuel_type)
         self._attr_name = f"{station_name} {fuel_name}"
 
-        # Disable less common fuel types by default
+        # Disable less common fuel types by default, but keep enabled if explicitly selected
         disabled_by_default = [
             FUEL_TYPE_NGAS,  # Natural Gas
             FUEL_TYPE_BGAS,  # Biogas
@@ -125,8 +210,15 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
             FUEL_TYPE_HVO,  # HVO Diesel
         ]
 
+        # If fuel type was explicitly selected in config, enable it regardless
+        config_fuels_str = coordinator.config_entry.data.get(CONF_FUELS, "")
+        if isinstance(config_fuels_str, str):
+            config_fuels = [f.strip() for f in config_fuels_str.split(",") if f.strip()]
+        else:
+            config_fuels = config_fuels_str or []
+
         self._attr_entity_registry_enabled_default = (
-            fuel_type not in disabled_by_default
+            fuel_type not in disabled_by_default or fuel_type in config_fuels
         )
 
         # Initialize device info

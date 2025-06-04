@@ -45,6 +45,8 @@ from .const import (
     CONF_STATION_ID,
     CONF_STATION_IDS,
     CONF_USE_LOCATION_FILTER,
+    CONF_IGNORED_CHAINS,
+    CONF_FUELS,
     DEFAULT_DISTANCE,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -53,6 +55,8 @@ from .const import (
 from .tankille_client import TankilleClient, ApiError, AuthenticationError
 
 _LOGGER = logging.getLogger(__name__)
+
+PLATFORMS: list[str] = ["sensor"]
 
 # Define the configuration schema for YAML setup
 CONFIG_SCHEMA = vol.Schema(
@@ -72,6 +76,8 @@ CONFIG_SCHEMA = vol.Schema(
                     }
                 ),
                 vol.Optional(CONF_STATION_IDS): vol.All(cv.ensure_list, [cv.string]),
+                vol.Optional(CONF_IGNORED_CHAINS): cv.string,
+                vol.Optional(CONF_FUELS): cv.string,
             }
         )
     },
@@ -136,13 +142,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "client": client,
     }
 
-    await hass.config_entries.async_forward_entry_setup(entry, "sensor")
+    # Set up listeners for options updates
+    entry.async_on_unload(entry.add_update_listener(async_update_listener))
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update."""
+    _LOGGER.debug("Configuration options updated, reloading Tankille integration")
+    # When config is updated, we need to reload the integration to apply the changes
+    # This ensures that fuel type filters and ignored chains are properly applied
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
         # Get the client and close its session
@@ -178,6 +195,14 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
         self.lat = config_entry.data.get(CONF_LOCATION_LAT)
         self.lon = config_entry.data.get(CONF_LOCATION_LON)
         self.distance = config_entry.data.get(CONF_DISTANCE, DEFAULT_DISTANCE)
+
+        # Log current configuration for debugging
+        _LOGGER.debug(
+            "Tankille coordinator initialized with location filter: %s, ignored chains: %s, fuels: %s",
+            self.use_location_filter,
+            config_entry.data.get(CONF_IGNORED_CHAINS, "None"),
+            config_entry.data.get(CONF_FUELS, "Default"),
+        )
 
         super().__init__(
             hass,

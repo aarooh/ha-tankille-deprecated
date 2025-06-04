@@ -10,6 +10,8 @@ CONF_DISTANCE = "distance"
 CONF_STATION_ID = "station_id"
 CONF_STATION_IDS = "station_ids"
 CONF_USE_LOCATION_FILTER = "use_location_filter"
+CONF_IGNORED_CHAINS = "ignored_chains"
+CONF_FUELS = "fuels"
 
 # Defaults
 DEFAULT_SCAN_INTERVAL = 3600  # 60 minutes
@@ -66,3 +68,13 @@ FUEL_TYPE_NAMES = {
     FUEL_TYPE_E85: "E85",
     FUEL_TYPE_HVO: "HVO Diesel",
 }
+
+# Default fuel types
+DEFAULT_FUEL_TYPES = [
+    FUEL_TYPE_95,
+    FUEL_TYPE_98,
+    FUEL_TYPE_DIESEL
+]
+
+# Common gas station chains for filtering
+COMMON_CHAINS = ["Neste", "St1", "ABC", "Teboil", "Shell", "Esso", "SEO"]
