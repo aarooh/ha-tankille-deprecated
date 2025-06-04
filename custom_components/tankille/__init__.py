@@ -152,8 +152,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update."""
     _LOGGER.debug("Configuration options updated, reloading Tankille integration")
-    # When config is updated, we need to reload the integration to apply the changes
-    # This ensures that fuel type filters and ignored chains are properly applied
+    
+    # Before reloading, we need to ensure that entity cleanup happens properly
+    # The reload process will call async_unload_entry followed by async_setup_entry
+    # The new async_setup_entry will handle the cleanup of obsolete entities
+    
     await hass.config_entries.async_reload(entry.entry_id)
 
 
