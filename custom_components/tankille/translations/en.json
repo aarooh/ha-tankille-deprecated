@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to Tankille",
-        "description": "Set up Tankille integration to track fuel prices in Finland. You can filter stations by search radius and ignore gas stations chains with comma separated list of chain names. e.g. ABC, Teboil ",
+        "description": "Set up Tankille integration to track fuel prices in Finland. You can filter stations by search radius and ignore gas stations chains with comma separated list of chain names. e.g. ABC, Teboil",
         "data": {
           "email": "Email",
           "password": "Password",

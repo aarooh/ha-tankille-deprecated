@@ -428,6 +428,19 @@ source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
+Manually updating to homeassistant.
+```bash
+cd /config/custom_components/
+
+# Remove the incorrectly placed directory
+rm -rf tankille
+
+# Clone and move files correctly
+git clone https://github.com/aarooh/hacs-tankille.git temp_tankille
+mv temp_tankille/custom_components/tankille ./tankille
+rm -rf temp_tankille
+```
+
 ## 📋 Roadmap
 
 ### Planned Features
