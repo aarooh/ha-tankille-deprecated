@@ -18,6 +18,7 @@ Home Assistant integration that provides **real-time fuel price data** from Tank
 - **⛽ Selective fuel type monitoring** - Choose which fuel types to track
 - **🚫 Gas station chain filtering** - Ignore specific chains (Neste, ABC, St1, etc.)
 - **📍 Location-based filtering** to find stations near you
+- **🎯 Station name filtering** - Include specific stations by name even if outside radius
 - **📱 Smart automation support** for price alerts and notifications
 - **🔍 Detailed station information** including address, coordinates, and last update times
 - **📈 Last updated sensors** automatically enabled for all stations
@@ -71,6 +72,7 @@ Home Assistant integration that provides **real-time fuel price data** from Tank
    - **Password**: Your Tankille account password
    - **Update Interval**: How often to check for price updates (default: 60 minutes)
    - **Location Filtering**: Configure latitude, longitude, and search radius
+   - **🆕 Station Names**: Include specific stations by name (even if outside radius)
    - **🆕 Ignored Gas Station Chains**: Comma-separated list (e.g., "Neste, ABC, St1")
    - **🆕 Fuel Types**: Select which fuel types to monitor
 
@@ -80,6 +82,7 @@ Home Assistant integration that provides **real-time fuel price data** from Tank
 > **💡 Pro Tips**: 
 > - Always use location filtering to avoid creating hundreds of sensors!
 > - Use 2-5 km radius in cities, 10-15 km in rural areas
+> - Add specific stations by name to include favorites outside your radius
 > - Select only fuel types you actually use to reduce sensor count
 
 ### 🆕 Reconfigure After Setup
@@ -89,7 +92,7 @@ You can modify **all settings** after initial setup:
 1. Go to **Settings** → **Devices & Services**
 2. Find your Tankille integration
 3. Click **Configure**
-4. Modify any settings (location, ignored chains, fuel types, etc.)
+4. Modify any settings (location, station names, ignored chains, fuel types, etc.)
 5. Integration automatically reloads with new settings
 
 ### Supported Fuel Types
@@ -123,6 +126,37 @@ Filter out unwanted gas stations by entering chain names:
 - Uses partial matching (substring search)
 - Case insensitive matching
 - Comma-separated list for multiple chains
+
+### 🆕 Station Names - Include Specific Stations
+
+Add specific gas stations by name, even if they're outside your location radius:
+
+**Examples:**
+- `"Shell Vantaa"` - Includes any Shell station in Vantaa
+- `"Neste Espoo, St1 Tampere"` - Includes specific stations in multiple cities
+- `"Express, Automat"` - Includes all Express and Automat stations regardless of location
+- `"Shell Kamppi, ABC Leppävaara, Neste Airport"` - Mix of specific station locations
+
+> **💡 Pro Tip**: Check the **Tankille mobile application** to see the exact station names and brands available in your area. The app shows the same station data that this integration uses, making it easier to find the correct names to include.
+
+**How it works:**
+- Searches through **all available stations** (not limited by location filter)
+- Matches against station **name** and **brand** fields
+- Uses partial matching (substring search) and case insensitive
+- Comma-separated list for multiple stations
+- **Combines with location filtering**: Gets stations within radius PLUS named stations outside radius
+- **Deduplication**: Avoids creating duplicate sensors if a station matches both location and name criteria
+
+**Use Cases:**
+- Include your favorite station that's slightly outside your location radius
+- Monitor specific stations along your commute route
+- Track prices at stations near your workplace or frequent destinations
+- Include a station with consistently good prices even if it's far away
+
+**Combined Filtering Example:**
+- **Location Filter**: 5km radius around Helsinki city center
+- **Station Names**: "Shell Vantaa, Neste Airport"
+- **Result**: All stations within 5km of Helsinki center + Shell Vantaa + Neste Airport (even if they're outside the 5km radius)
 
 ## 🚀 Dashboard Examples
 
@@ -364,12 +398,33 @@ Each fuel price sensor provides:
 4. Verify station names in entity attributes
 ```
 
+**Issue**: Station names not being found
+```yaml
+# Solutions:
+1. Check spelling of station names (partial matching is supported)
+2. Try using brand names instead (e.g., "Shell" instead of "Shell Express Kamppi")
+3. Use shorter, more generic terms (e.g., "Vantaa" to find all stations in Vantaa)
+4. Check debug logs to see what stations were found by name search
+5. Verify station exists in Tankille database via their mobile app
+6. **💡 Use the Tankille mobile app to browse available stations and copy exact names**
+```
+
+**Issue**: Too many stations being included by name search
+```yaml
+# Solutions:
+1. Use more specific search terms (e.g., "Shell Kamppi" instead of "Shell")
+2. Use exact location names (e.g., "Neste Vantaa Myyrmäki" instead of "Neste")
+3. Combine with ignored chains to filter out unwanted results
+4. Check entity registry to disable unwanted sensors manually
+```
+
 **Issue**: Too many fuel type sensors
 ```yaml
 # Solutions:
 1. Reconfigure integration and select fewer fuel types
 2. Disable unwanted sensors in entity registry
 3. Use ignored chains to filter out unwanted stations
+4. Be more specific with station names to reduce station count
 ```
 
 ### Debug Logging
@@ -476,6 +531,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Version 0.2.0 - Enhanced Filtering & Configuration
 
 #### 🆕 **New Features**
+- **Station Names Filtering**: Include specific stations by name even if outside location radius
+  - Search through all available stations using partial name matching
+  - Combine with location filtering for comprehensive station selection
+  - Support for comma-separated list of station names or brands
+  - Perfect for including favorite stations outside your normal radius
 - **Fuel Type Selection**: Choose specific fuel types during setup and in options
   - Multi-select UI with checkboxes for all available fuel types
   - Defaults to most common types (95E10, 98E5, Diesel, E85)
@@ -486,7 +546,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   - More intuitive filtering based on what users actually see
 - **Complete Options Flow**: 
   - Modify ALL settings after initial setup without recreating integration
-  - Change location, ignored chains, fuel types, scan interval, etc.
+  - Change location, station names, ignored chains, fuel types, scan interval, etc.
   - Integration automatically reloads when settings change
 
 #### 🔧 **Improvements**
