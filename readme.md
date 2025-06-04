@@ -7,9 +7,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/aarooh/hacs-tankille.svg)](https://github.com/aarooh/hacs-tankille/issues)
 [![Validate](https://github.com/aarooh/hacs-tankille/actions/workflows/validate.yml/badge.svg)](https://github.com/aarooh/hacs-tankille/actions/workflows/validate.yml)
 
-<p align="left">
-  <img src="images/logo.png" alt="Tankille Logo" width="200"/>
-</p>
+![logo](https://github.com/user-attachments/assets/11296282-7ed7-4c5c-af5a-cc0a3dfdd898)
 
 Home Assistant integration that provides **real-time fuel price data** from Tankille API for gas stations across Finland. Monitor fuel prices, set up price alerts, and find the cheapest fuel near you!
 
@@ -63,9 +61,7 @@ Home Assistant integration that provides **real-time fuel price data** from Tank
    - Settings → Devices & Services → Add Integration
    - Search for "Tankille"
 
-<p align="center">
-  <img src="images/screenshots/config-flow/01-add-integration.png" alt="Add Integration" width="300" height="500"/>
-</p>
+![01-add-integration](https://github.com/user-attachments/assets/266cf3fe-bed0-49c8-9c6c-60397f21e656)
 
 2. **Enter Credentials and Configure Location**:
    - **Email**: Your Tankille account email
@@ -73,9 +69,8 @@ Home Assistant integration that provides **real-time fuel price data** from Tank
    - **Update Interval**: How often to check for price updates (default: 60 minutes)
    - **Location Filtering**: Configure latitude, longitude, and search radius
 
-<p align="center">
-  <img src="images/screenshots/config-flow/02-login-and-location-setup.png" alt="Configuration Setup" width="300" height="500"/>
-</p>
+![02-login-and-location-setup](https://github.com/user-attachments/assets/62ade903-91e6-4ef9-9a78-d2b0974e8b0b)
+
 
 > **💡 Pro Tip**: Always use location filtering to avoid creating hundreds of sensors for stations across Finland!
 
@@ -101,9 +96,8 @@ Home Assistant integration that provides **real-time fuel price data** from Tank
 
 Create a complete fuel monitoring setup with these four complementary cards:
 
-<p align="center">
-  <img src="images/screenshots/dashboard-hero.png" alt="Entity Details" width="1080" height="700"/>
-</p>
+![dashboard-hero](https://github.com/user-attachments/assets/66074884-81b1-4061-969c-40f8fc5709aa)
+
 
 #### 1. Main Fuel Prices Overview
 ```yaml
@@ -242,9 +236,8 @@ automation:
 
 ## 🔍 Entity Details
 
-<p align="center">
-  <img src="images/screenshots/entities/entities-overview.png" alt="Entity Overview" width="800"/>
-</p>
+![entities-overview](https://github.com/user-attachments/assets/1b0cd4ac-4a14-4846-a49e-ae896efb9f65)
+
 
 *Overview of Tankille sensors in Home Assistant showing all fuel price entities*
 
@@ -265,9 +258,8 @@ Each fuel price sensor provides:
 - `price_reporter`: Who reported the price
 - `last_update_formatted`: Human-readable update time
 
-<p align="center">
-  <img src="images/screenshots/entities/entity-details.png" alt="Entity Details" width="600"/>
-</p>
+![entity-details](https://github.com/user-attachments/assets/ee6b1662-013e-4445-a538-3bfd9618f3f2)
+
 
 *Detailed view of a single fuel price sensor showing all available attributes*
 
