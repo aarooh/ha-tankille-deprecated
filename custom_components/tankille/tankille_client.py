@@ -392,24 +392,28 @@ class TankilleClient:
 
         # Get all stations first
         all_stations = await self.get_stations()
-        
+
         # Filter stations by name (case-insensitive partial matching)
         matching_stations = []
-        station_names_lower = [name.lower().strip() for name in station_names if name.strip()]
-        
+        station_names_lower = [
+            name.lower().strip() for name in station_names if name.strip()
+        ]
+
         for station in all_stations:
-            station_name = station.get('name', '').lower()
-            station_brand = station.get('brand', '').lower()
-            
+            station_name = station.get("name", "").lower()
+            station_brand = station.get("brand", "").lower()
+
             # Check if any of the search names match the station name or brand
             for search_name in station_names_lower:
-                if (search_name in station_name or 
-                    search_name in station_brand or 
-                    station_name.startswith(search_name) or 
-                    station_brand.startswith(search_name)):
+                if (
+                    search_name in station_name
+                    or search_name in station_brand
+                    or station_name.startswith(search_name)
+                    or station_brand.startswith(search_name)
+                ):
                     matching_stations.append(station)
                     break  # Avoid duplicates if multiple patterns match
-        
+
         return matching_stations
 
     # --- Utility methods ---

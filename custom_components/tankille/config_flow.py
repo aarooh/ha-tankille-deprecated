@@ -195,8 +195,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         # Get current values from options OR data (fallback for backward compatibility)
         def get_current_value(key, default):
             # Check options first, then data
-            return self.config_entry.options.get(key, 
-                   self.config_entry.data.get(key, default))
+            return self.config_entry.options.get(
+                key, self.config_entry.data.get(key, default)
+            )
 
         current_scan_interval = get_current_value(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL

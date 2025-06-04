@@ -71,11 +71,7 @@ FUEL_TYPE_NAMES = {
 }
 
 # Default fuel types
-DEFAULT_FUEL_TYPES = [
-    FUEL_TYPE_95,
-    FUEL_TYPE_98,
-    FUEL_TYPE_DIESEL
-]
+DEFAULT_FUEL_TYPES = [FUEL_TYPE_95, FUEL_TYPE_98, FUEL_TYPE_DIESEL]
 
 # Common gas station chains for filtering
 COMMON_CHAINS = ["Neste", "St1", "ABC", "Teboil", "Shell", "Esso", "SEO"]

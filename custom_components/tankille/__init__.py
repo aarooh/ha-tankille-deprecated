@@ -153,14 +153,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update without full reload."""
     _LOGGER.debug("Configuration options updated, managing entities dynamically")
-    
-    coordinator: TankilleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    
+
+    coordinator: TankilleDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id][
+        "coordinator"
+    ]
+
     # Update the coordinator's config entry reference
     coordinator.config_entry = entry
-    
+
     # Handle entity management directly without reload
     from .sensor import handle_config_update
+
     await handle_config_update(hass, entry, coordinator)
 
 
@@ -204,7 +207,9 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
 
     def get_config_value(self, key: str, default=None):
         """Get configuration value from options (preferred) or data (fallback)."""
-        return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
+        return self.config_entry.options.get(
+            key, self.config_entry.data.get(key, default)
+        )
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from Tankille API."""
@@ -220,9 +225,11 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
         station_names_str = self.get_config_value(CONF_STATION_NAMES, "")
 
         # Parse station names
-        station_names = [
-            name.strip() for name in station_names_str.split(",") if name.strip()
-        ] if station_names_str else []
+        station_names = (
+            [name.strip() for name in station_names_str.split(",") if name.strip()]
+            if station_names_str
+            else []
+        )
 
         # Log current configuration for debugging
         _LOGGER.debug(
@@ -270,8 +277,10 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                 # Get additional stations by name if specified
                 if station_names:
                     _LOGGER.info("Fetching stations by names: %s", station_names)
-                    stations_by_name = await self.client.find_stations_by_name(station_names)
-                    
+                    stations_by_name = await self.client.find_stations_by_name(
+                        station_names
+                    )
+
                     # Combine stations, avoiding duplicates
                     existing_station_ids = {station.get("_id") for station in stations}
                     for station in stations_by_name:
@@ -282,7 +291,14 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                     "Found %d stations total (%d by location, %d by name)",
                     len(stations),
                     len(stations_by_location),
-                    len([s for s in stations_by_name if s.get("_id") not in {st.get("_id") for st in stations_by_location}])
+                    len(
+                        [
+                            s
+                            for s in stations_by_name
+                            if s.get("_id")
+                            not in {st.get("_id") for st in stations_by_location}
+                        ]
+                    ),
                 )
 
             except asyncio.TimeoutError:

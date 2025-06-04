@@ -15,8 +15,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CURRENCY_EURO
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback, async_get_current_platform
-from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
+from homeassistant.helpers.entity_platform import (
+    AddEntitiesCallback,
+    async_get_current_platform,
+)
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 from homeassistant.helpers import entity_registry as er
 
 from . import TankilleDataUpdateCoordinator
@@ -101,7 +107,7 @@ async def async_setup_entry(
     """Set up Tankille sensor entries."""
     global _add_entities_callback
     _add_entities_callback = async_add_entities
-    
+
     client: TankilleClient = hass.data[DOMAIN][config_entry.entry_id]["client"]
     coordinator: TankilleDataUpdateCoordinator = hass.data[DOMAIN][
         config_entry.entry_id
@@ -124,7 +130,9 @@ async def async_setup_entry(
 
     selected_fuels_config = get_config_value(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
     if isinstance(selected_fuels_config, str):
-        selected_fuels = [f.strip() for f in selected_fuels_config.split(",") if f.strip()]
+        selected_fuels = [
+            f.strip() for f in selected_fuels_config.split(",") if f.strip()
+        ]
     elif isinstance(selected_fuels_config, list):
         selected_fuels = selected_fuels_config
     else:
@@ -158,7 +166,9 @@ async def async_setup_entry(
         station_chain = station_data.get("chain", "")
 
         # Check if station should be ignored
-        if is_station_ignored(station_name, station_brand, station_chain, ignored_chains):
+        if is_station_ignored(
+            station_name, station_brand, station_chain, ignored_chains
+        ):
             _LOGGER.debug(
                 "Ignoring station '%s' (brand: %s, chain: %s)",
                 station_name,
@@ -176,7 +186,7 @@ async def async_setup_entry(
         # Add fuel price sensors for selected fuel types
         station_fuel_count = 0
         available_fuels = station_data.get("fuels", [])
-        
+
         for fuel_type_code in available_fuels:
             if fuel_type_code in FUEL_TYPES and fuel_type_code in selected_fuels:
                 entities_to_add.append(
@@ -195,7 +205,7 @@ async def async_setup_entry(
 
     # Add all the entities
     total_entities = len(entities_to_add)
-    
+
     _LOGGER.info(
         "Setup complete: %d stations processed, %d ignored, creating %d entities",
         stations_processed,
@@ -209,15 +219,20 @@ async def async_setup_entry(
     else:
         _LOGGER.info("No entities to add")
 
-async def cleanup_orphaned_entities(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+
+async def cleanup_orphaned_entities(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> None:
     """Clean up orphaned entities that are no longer provided by the integration."""
     entity_registry = er.async_get(hass)
-    
+
     # Get all entities for this config entry
-    all_entities = er.async_entries_for_config_entry(entity_registry, config_entry.entry_id)
-    
+    all_entities = er.async_entries_for_config_entry(
+        entity_registry, config_entry.entry_id
+    )
+
     orphaned_entities = []
-    
+
     for entity_entry in all_entities:
         # Check if entity is orphaned (no longer has a valid state)
         if entity_entry.platform == DOMAIN:
@@ -226,18 +241,23 @@ async def cleanup_orphaned_entities(hass: HomeAssistant, config_entry: ConfigEnt
             if state is None:
                 # This entity has no state, likely orphaned
                 orphaned_entities.append(entity_entry)
-            elif state.state == "unavailable" and "no longer being provided" in str(state.attributes.get("friendly_name", "")):
+            elif state.state == "unavailable" and "no longer being provided" in str(
+                state.attributes.get("friendly_name", "")
+            ):
                 # This entity is marked as no longer provided
                 orphaned_entities.append(entity_entry)
-    
+
     if orphaned_entities:
-        _LOGGER.info(f"Found {len(orphaned_entities)} potentially orphaned entities, cleaning up...")
+        _LOGGER.info(
+            f"Found {len(orphaned_entities)} potentially orphaned entities, cleaning up..."
+        )
         for entity_entry in orphaned_entities:
             _LOGGER.debug(f"Removing orphaned entity: {entity_entry.entity_id}")
             entity_registry.async_remove_entity(entity_entry.entity_id)
         _LOGGER.info(f"Cleaned up {len(orphaned_entities)} orphaned entities")
     else:
         _LOGGER.debug("No orphaned entities found")
+
 
 async def handle_config_update(
     hass: HomeAssistant,
@@ -246,7 +266,7 @@ async def handle_config_update(
 ) -> None:
     """Handle configuration updates by managing entities dynamically."""
     global _add_entities_callback
-    
+
     # Helper function to get config values (options take precedence over data)
     def get_config_value(key: str, default=None):
         """Get configuration value from options (preferred) or data (fallback)."""
@@ -259,7 +279,7 @@ async def handle_config_update(
     existing_entities = er.async_entries_for_config_entry(
         entity_registry, config_entry.entry_id
     )
-    
+
     # Get current configuration
     ignored_chains_str = get_config_value(CONF_IGNORED_CHAINS, "")
     ignored_chains = [
@@ -270,7 +290,9 @@ async def handle_config_update(
 
     selected_fuels_config = get_config_value(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
     if isinstance(selected_fuels_config, str):
-        selected_fuels = [f.strip() for f in selected_fuels_config.split(",") if f.strip()]
+        selected_fuels = [
+            f.strip() for f in selected_fuels_config.split(",") if f.strip()
+        ]
     elif isinstance(selected_fuels_config, list):
         selected_fuels = selected_fuels_config
     else:
@@ -278,20 +300,22 @@ async def handle_config_update(
 
     entities_to_remove = []
     existing_unique_ids = set()
-    
+
     for entity_entry in existing_entities:
         unique_id = entity_entry.unique_id
         existing_unique_ids.add(unique_id)
         should_remove = False
-        
+
         # Parse the unique_id to get station_id and fuel_type
         if unique_id.startswith(f"{DOMAIN}_"):
-            parts = unique_id[len(f"{DOMAIN}_"):].split("_")
+            parts = unique_id[len(f"{DOMAIN}_") :].split("_")
             if len(parts) >= 2:
                 station_id = parts[0]
-                
+
                 # Get station data
-                station_data = coordinator.data.get(station_id) if coordinator.data else None
+                station_data = (
+                    coordinator.data.get(station_id) if coordinator.data else None
+                )
                 if not station_data:
                     # Station no longer exists
                     should_remove = True
@@ -299,9 +323,11 @@ async def handle_config_update(
                     station_name = station_data.get("name", "")
                     station_brand = station_data.get("brand", "")
                     station_chain = station_data.get("chain", "")
-                    
+
                     # Check if station is now ignored
-                    if is_station_ignored(station_name, station_brand, station_chain, ignored_chains):
+                    if is_station_ignored(
+                        station_name, station_brand, station_chain, ignored_chains
+                    ):
                         should_remove = True
                     # Check if this is a fuel sensor (not the last_updated sensor)
                     elif unique_id.endswith("_last_updated"):
@@ -312,13 +338,16 @@ async def handle_config_update(
                         fuel_type = parts[-1]
                         if fuel_type not in selected_fuels:
                             should_remove = True
-        
+
         if should_remove:
             entities_to_remove.append(entity_entry)
-    
+
     # Remove obsolete entities
     if entities_to_remove:
-        _LOGGER.info("Removing %d obsolete entities due to configuration changes", len(entities_to_remove))
+        _LOGGER.info(
+            "Removing %d obsolete entities due to configuration changes",
+            len(entities_to_remove),
+        )
         for entity_entry in entities_to_remove:
             _LOGGER.debug(
                 "Removing obsolete entity: %s (%s)",
@@ -334,24 +363,28 @@ async def handle_config_update(
         return
 
     new_entities_to_add = []
-    
+
     for station_id, station_data in coordinator.data.items():
         station_name = station_data.get("name", "Unknown Station")
         station_brand = station_data.get("brand", "")
         station_chain = station_data.get("chain", "")
 
         # Check if station should be ignored
-        if is_station_ignored(station_name, station_brand, station_chain, ignored_chains):
+        if is_station_ignored(
+            station_name, station_brand, station_chain, ignored_chains
+        ):
             continue
 
         # Add station update sensor if it doesn't exist
         update_sensor_id = f"{DOMAIN}_{station_id}_last_updated"
         if update_sensor_id not in existing_unique_ids:
-            new_entities_to_add.append(TankilleStationUpdateSensor(coordinator, station_id))
+            new_entities_to_add.append(
+                TankilleStationUpdateSensor(coordinator, station_id)
+            )
 
         # Add fuel price sensors for selected fuel types
         available_fuels = station_data.get("fuels", [])
-        
+
         for fuel_type_code in available_fuels:
             if fuel_type_code in FUEL_TYPES and fuel_type_code in selected_fuels:
                 fuel_sensor_id = f"{DOMAIN}_{station_id}_{fuel_type_code}"
@@ -362,13 +395,16 @@ async def handle_config_update(
 
     # Add new entities
     if new_entities_to_add and _add_entities_callback:
-        _LOGGER.info("Adding %d new entities due to configuration changes", len(new_entities_to_add))
+        _LOGGER.info(
+            "Adding %d new entities due to configuration changes",
+            len(new_entities_to_add),
+        )
         _add_entities_callback(new_entities_to_add, True)
     elif new_entities_to_add:
         _LOGGER.warning("Cannot add new entities - no callback available")
     else:
         _LOGGER.info("No new entities needed")
-    
+
     # Clean up any orphaned entities that might be left behind
     await cleanup_orphaned_entities(hass, config_entry)
 
