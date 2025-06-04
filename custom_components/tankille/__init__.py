@@ -47,6 +47,7 @@ from .const import (
     CONF_USE_LOCATION_FILTER,
     CONF_IGNORED_CHAINS,
     CONF_FUELS,
+    CONF_STATION_NAMES,
     DEFAULT_DISTANCE,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -216,11 +217,18 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
         lat = self.get_config_value(CONF_LOCATION_LAT)
         lon = self.get_config_value(CONF_LOCATION_LON)
         distance = self.get_config_value(CONF_DISTANCE, DEFAULT_DISTANCE)
+        station_names_str = self.get_config_value(CONF_STATION_NAMES, "")
+
+        # Parse station names
+        station_names = [
+            name.strip() for name in station_names_str.split(",") if name.strip()
+        ] if station_names_str else []
 
         # Log current configuration for debugging
         _LOGGER.debug(
-            "Tankille coordinator updating with location filter: %s, ignored chains: %s, fuels: %s",
+            "Tankille coordinator updating with location filter: %s, station names: %s, ignored chains: %s, fuels: %s",
             use_location_filter,
+            station_names,
             self.get_config_value(CONF_IGNORED_CHAINS, "None"),
             self.get_config_value(CONF_FUELS, "Default"),
         )
@@ -238,6 +246,11 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
 
             # Get stations based on configuration
             try:
+                stations = []
+                stations_by_location = []
+                stations_by_name = []
+
+                # Get stations by location if location filter is enabled
                 if use_location_filter and lat and lon:
                     _LOGGER.info(
                         "Fetching stations within %s meters of %.6f, %.6f",
@@ -245,12 +258,33 @@ class TankilleDataUpdateCoordinator(DataUpdateCoordinator):
                         float(lat),
                         float(lon),
                     )
-                    stations = await self.client.get_stations_by_location(
+                    stations_by_location = await self.client.get_stations_by_location(
                         float(lat), float(lon), int(distance)
                     )
-                else:
+                    stations.extend(stations_by_location)
+                elif not station_names:
+                    # If no location filter and no station names, get all stations
                     _LOGGER.info("Fetching all stations")
                     stations = await self.client.get_stations()
+
+                # Get additional stations by name if specified
+                if station_names:
+                    _LOGGER.info("Fetching stations by names: %s", station_names)
+                    stations_by_name = await self.client.find_stations_by_name(station_names)
+                    
+                    # Combine stations, avoiding duplicates
+                    existing_station_ids = {station.get("_id") for station in stations}
+                    for station in stations_by_name:
+                        if station.get("_id") not in existing_station_ids:
+                            stations.append(station)
+
+                _LOGGER.info(
+                    "Found %d stations total (%d by location, %d by name)",
+                    len(stations),
+                    len(stations_by_location),
+                    len([s for s in stations_by_name if s.get("_id") not in {st.get("_id") for st in stations_by_location}])
+                )
+
             except asyncio.TimeoutError:
                 self.retry_count += 1
                 _LOGGER.warning(

@@ -22,6 +22,7 @@ from .const import (
     CONF_USE_LOCATION_FILTER,
     CONF_IGNORED_CHAINS,
     CONF_FUELS,
+    CONF_STATION_NAMES,
     FUEL_TYPES,
     FUEL_TYPE_NAMES,
     DEFAULT_FUEL_TYPES,
@@ -104,6 +105,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         default_lon = self.hass.config.longitude
         default_ignored_chains = ""
         default_fuels = DEFAULT_FUEL_TYPES  # Default to most common fuel types
+        default_station_names = ""
 
         STEP_USER_DATA_SCHEMA = vol.Schema(
             {
@@ -117,6 +119,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Coerce(int), vol.Range(min=1000, max=50000)
                 ),
                 vol.Optional(CONF_IGNORED_CHAINS, default=default_ignored_chains): str,
+                vol.Optional(CONF_STATION_NAMES, default=default_station_names): str,
                 vol.Optional(CONF_FUELS, default=default_fuels): cv.multi_select(
                     {
                         fuel_code: f"{FUEL_TYPE_NAMES[fuel_code]} ({fuel_code})"
@@ -131,7 +134,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
             description_placeholders={
-                "info": "Configure Tankille integration. Location filtering is strongly recommended to avoid creating hundreds of sensors.\n\nTip: Use 2-5 km radius in cities, 10-15 km in rural areas.\n\nYou can ignore specific gas station chains (e.g., 'Neste, ABC') and select which fuel types to monitor."
+                "info": "Configure Tankille integration. Location filtering is strongly recommended to avoid creating hundreds of sensors.\n\nTip: Use 2-5 km radius in cities, 10-15 km in rural areas.\n\nYou can ignore specific gas station chains (e.g., 'Neste, ABC'), add specific stations by name (e.g., 'Shell Vantaa, Neste Espoo') even if outside radius, and select which fuel types to monitor."
             },
         )
 
@@ -207,6 +210,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
         current_distance = get_current_value(CONF_DISTANCE, DEFAULT_DISTANCE)
         current_ignored_chains = get_current_value(CONF_IGNORED_CHAINS, "")
+        current_station_names = get_current_value(CONF_STATION_NAMES, "")
 
         # Handle fuel types - convert from comma-separated string to list
         current_fuels_str = get_current_value(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
@@ -244,6 +248,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     default=current_ignored_chains,
                 ): str,
                 vol.Optional(
+                    CONF_STATION_NAMES,
+                    default=current_station_names,
+                ): str,
+                vol.Optional(
                     CONF_FUELS,
                     default=current_fuels,
                 ): cv.multi_select(
@@ -260,7 +268,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=OPTIONS_SCHEMA,
             errors=errors,
             description_placeholders={
-                "info": "Update Tankille integration settings.\n\n• Ignored Chains: Comma-separated list of gas station chains to ignore (e.g., 'Neste, ABC, St1')\n• Fuel Types: Select which fuel types to monitor\n• Location: Adjust search area for nearby stations"
+                "info": "Update Tankille integration settings.\n\n• Station Names: Comma-separated list of station names to include even if outside location filter (e.g., 'Shell Vantaa, Neste Espoo')\n• Ignored Chains: Comma-separated list of gas station chains to ignore (e.g., 'Neste, ABC, St1')\n• Fuel Types: Select which fuel types to monitor\n• Location: Adjust search area for nearby stations"
             },
         )
 

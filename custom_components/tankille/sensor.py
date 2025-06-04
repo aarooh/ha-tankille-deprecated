@@ -209,6 +209,35 @@ async def async_setup_entry(
     else:
         _LOGGER.info("No entities to add")
 
+async def cleanup_orphaned_entities(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    """Clean up orphaned entities that are no longer provided by the integration."""
+    entity_registry = er.async_get(hass)
+    
+    # Get all entities for this config entry
+    all_entities = er.async_entries_for_config_entry(entity_registry, config_entry.entry_id)
+    
+    orphaned_entities = []
+    
+    for entity_entry in all_entities:
+        # Check if entity is orphaned (no longer has a valid state)
+        if entity_entry.platform == DOMAIN:
+            # Try to find if the entity ID exists in the current state machine
+            state = hass.states.get(entity_entry.entity_id)
+            if state is None:
+                # This entity has no state, likely orphaned
+                orphaned_entities.append(entity_entry)
+            elif state.state == "unavailable" and "no longer being provided" in str(state.attributes.get("friendly_name", "")):
+                # This entity is marked as no longer provided
+                orphaned_entities.append(entity_entry)
+    
+    if orphaned_entities:
+        _LOGGER.info(f"Found {len(orphaned_entities)} potentially orphaned entities, cleaning up...")
+        for entity_entry in orphaned_entities:
+            _LOGGER.debug(f"Removing orphaned entity: {entity_entry.entity_id}")
+            entity_registry.async_remove_entity(entity_entry.entity_id)
+        _LOGGER.info(f"Cleaned up {len(orphaned_entities)} orphaned entities")
+    else:
+        _LOGGER.debug("No orphaned entities found")
 
 async def handle_config_update(
     hass: HomeAssistant,
@@ -339,6 +368,9 @@ async def handle_config_update(
         _LOGGER.warning("Cannot add new entities - no callback available")
     else:
         _LOGGER.info("No new entities needed")
+    
+    # Clean up any orphaned entities that might be left behind
+    await cleanup_orphaned_entities(hass, config_entry)
 
 
 class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):

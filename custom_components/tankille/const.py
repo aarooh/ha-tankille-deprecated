@@ -12,6 +12,7 @@ CONF_STATION_IDS = "station_ids"
 CONF_USE_LOCATION_FILTER = "use_location_filter"
 CONF_IGNORED_CHAINS = "ignored_chains"
 CONF_FUELS = "fuels"
+CONF_STATION_NAMES = "station_names"
 
 # Defaults
 DEFAULT_SCAN_INTERVAL = 3600  # 60 minutes
