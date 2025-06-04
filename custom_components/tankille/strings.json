@@ -12,7 +12,7 @@
           "lat": "Latitude",
           "lon": "Longitude",
           "distance": "Search radius (meters, 5000 = 5 km)",
-          "ignored_chains": "Ignored gas station chains (comma-separated, e.g., 'Neste, ABC')",
+          "ignored_chains": "Ignored gas station chains (comma-separated, e.g., 'Neste, ABC', 'Teboil, ST1')",
           "fuels": "Fuel types to monitor"
         }
       }
@@ -34,14 +34,14 @@
     "step": {
       "init": {
         "title": "Configure Tankille Options",
-        "description": "Update Tankille integration settings.\n\n• Ignored Chains: Comma-separated list of gas station chains to ignore (e.g., 'Neste, ABC, St1')\n• Fuel Types: Select which fuel types to monitor\n• Location: Adjust search area for nearby stations",
+        "description": "Update Tankille integration settings.\n\n• Ignored Chains: Comma-separated list of gas station chains to ignore (e.g., 'Neste, ABC', 'Teboil, ST1')\n• Fuel Types: Select which fuel types to monitor\n• Location: Adjust search area for nearby stations",
         "data": {
           "scan_interval": "Update interval (seconds)",
           "use_location_filter": "Filter stations by location",
           "lat": "Latitude",
           "lon": "Longitude",
           "distance": "Search radius (meters, 5000 = 5 km)",
-          "ignored_chains": "Ignored gas station chains (comma-separated)",
+          "ignored_chains": "Ignored gas station chains (comma-separated, e.g., 'Neste, ABC', 'Teboil, ST1')",
           "fuels": "Fuel types to monitor"
         }
       }

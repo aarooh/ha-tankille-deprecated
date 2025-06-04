@@ -17,6 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers import entity_registry as er
 
 from . import TankilleDataUpdateCoordinator
 from .const import (
@@ -101,7 +102,10 @@ async def async_setup_entry(
     ]["coordinator"]
 
     # Get ignored chains from config entry, defaulting to empty string then splitting
-    ignored_chains_str = config_entry.data.get(CONF_IGNORED_CHAINS, "")
+    # Ensure we read from options if available, falling back to data
+    ignored_chains_str = config_entry.options.get(
+        CONF_IGNORED_CHAINS, config_entry.data.get(CONF_IGNORED_CHAINS, "")
+    )
     ignored_chains = [
         chain.strip().lower()
         for chain in ignored_chains_str.split(",")
@@ -109,11 +113,16 @@ async def async_setup_entry(
     ]
 
     # Get selected fuel types from config entry
-    selected_fuels_str = config_entry.data.get(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
-    if isinstance(selected_fuels_str, str):
-        selected_fuels = [f.strip() for f in selected_fuels_str.split(",") if f.strip()]
+    # Ensure we read from options if available, falling back to data
+    selected_fuels_config = config_entry.options.get(
+        CONF_FUELS, config_entry.data.get(CONF_FUELS, ",".join(DEFAULT_FUEL_TYPES))
+    )
+    if isinstance(selected_fuels_config, str):
+        selected_fuels = [f.strip() for f in selected_fuels_config.split(",") if f.strip()]
+    elif isinstance(selected_fuels_config, list):
+        selected_fuels = selected_fuels_config
     else:
-        selected_fuels = selected_fuels_str or DEFAULT_FUEL_TYPES
+        selected_fuels = DEFAULT_FUEL_TYPES
 
     _LOGGER.info(
         "Setting up sensors with ignored chains: %s, selected fuels: %s",
@@ -123,9 +132,15 @@ async def async_setup_entry(
 
     all_stations_data = coordinator.data
     if not all_stations_data:
+        _LOGGER.warning("No station data available from coordinator, requesting refresh.")
         await coordinator.async_request_refresh()
+        all_stations_data = coordinator.data # Re-fetch after refresh
+        if not all_stations_data:
+            _LOGGER.error("Still no station data after refresh, cannot set up sensors.")
+            return
 
     entities_to_add: list[SensorEntity] = []
+    active_unique_ids: set[str] = set()
 
     for station_id, station_data in all_stations_data.items():
         station_name = station_data.get("name", "Unknown Station")
@@ -144,24 +159,59 @@ async def async_setup_entry(
             )
             continue
 
-        # Last updated sensor for the station (always create)
+        # Add unique ID for the station update sensor
+        station_update_sensor_unique_id = f"{DOMAIN}_{station_id}_last_updated"
+        active_unique_ids.add(station_update_sensor_unique_id)
         entities_to_add.append(TankilleStationUpdateSensor(coordinator, station_id))
 
         # Create sensors only for selected fuel types that are available at the station
-        for fuel_type in station_data.get("fuels", []):
-            if fuel_type in FUEL_TYPES and fuel_type in selected_fuels:
+        for fuel_type_code in station_data.get("fuels", []):
+            fuel_info = station_data["fuels"].get(fuel_type_code, {})
+            if fuel_type_code in FUEL_TYPES and fuel_type_code in selected_fuels:
+                fuel_price_sensor_unique_id = f"{DOMAIN}_{station_id}_{fuel_type_code}"
+                active_unique_ids.add(fuel_price_sensor_unique_id)
                 entities_to_add.append(
-                    TankilleFuelPriceSensor(coordinator, station_id, fuel_type)
+                    TankilleFuelPriceSensor(coordinator, station_id, fuel_type_code)
                 )
-            elif fuel_type in FUEL_TYPES and fuel_type not in selected_fuels:
+            elif fuel_type_code in FUEL_TYPES and fuel_type_code not in selected_fuels:
                 _LOGGER.debug(
-                    "Skipping fuel type %s for station %s - not in selected fuels",
-                    fuel_type,
+                    "Skipping fuel type %s for station %s - not in selected fuels list: %s",
+                    fuel_type_code,
                     station_name,
+                    selected_fuels
                 )
+            # else: # Fuel type from station not in our master FUEL_TYPES list
+                # _LOGGER.debug("Unknown fuel type %s at station %s", fuel_type_code, station_name)
+
+    # Remove stale entities
+    entity_registry = er.async_get(hass)
+    current_hass_entities = er.async_entries_for_config_entry(
+        entity_registry, config_entry.entry_id
+    )
+
+    stale_entities_to_remove: list[str] = []
+    for entity_entry in current_hass_entities:
+        if entity_entry.unique_id not in active_unique_ids:
+            _LOGGER.debug(
+                "Removing stale entity: %s (%s)",
+                entity_entry.entity_id,
+                entity_entry.unique_id,
+            )
+            stale_entities_to_remove.append(entity_entry.entity_id)
+
+    for entity_id in stale_entities_to_remove:
+        entity_registry.async_remove_entity(entity_id)
+        
+    # Log device cleanup attempt (devices are removed if all their entities are gone)
+    if stale_entities_to_remove:
+        _LOGGER.info(
+            "Removed %d stale entities. Associated devices will be cleaned up by HA if no entities remain",
+            len(stale_entities_to_remove),
+        )
 
     _LOGGER.info(
-        "Created %d entities for %d stations (filtered by %d ignored chains, %d selected fuel types)",
+        "Identified %d active unique IDs. Attempting to add/update %d entities for %d stations (filtered by %d ignored chains, %d selected fuel types)",
+        len(active_unique_ids),
         len(entities_to_add),
         len([e for e in entities_to_add if isinstance(e, TankilleStationUpdateSensor)]),
         len(ignored_chains),
