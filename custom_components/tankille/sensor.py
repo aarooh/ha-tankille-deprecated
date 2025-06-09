@@ -424,6 +424,8 @@ class TankilleFuelPriceSensor(CoordinatorEntity, SensorEntity):
         self.fuel_type = fuel_type
         self._attr_native_unit_of_measurement = CURRENCY_EURO
         self._attr_device_class = SensorDeviceClass.MONETARY
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_suggested_display_precision = 3
 
         # Initialize station data
         self._station = (
