@@ -1,4 +1,4 @@
-# Tankille for Home Assistant
+# Tankille for Home Assistant (Currently the Tankille API isn't allowing requests outside their mobile application, this repo will not work until further notice)
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/aarooh/hacs-tankille.svg)](https://github.com/aarooh/hacs-tankille/releases)
